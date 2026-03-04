@@ -22,11 +22,13 @@
         --bg-darker: #050510;
         --bg-card: #12122a;
         --bg-input: #1a1a3a;
+        --bg-editor: #0d0d1a;
         --neon-blue: #00d4ff;
         --neon-purple: #b347ff;
         --neon-green: #00ff88;
         --neon-pink: #ff47ab;
         --neon-orange: #ff8800;
+        --neon-cyan: #00ffff;
         --text-primary: #ffffff;
         --text-secondary: #a0a0c0;
         --border-glow: 0 0 10px var(--neon-blue), 0 0 20px rgba(0, 212, 255, 0.3);
@@ -482,6 +484,7 @@
         padding: 15px 25px;
         background: linear-gradient(135deg, var(--bg-card), var(--bg-darker));
         border-bottom: 2px solid rgba(0, 212, 255, 0.3);
+        flex-shrink: 0;
     }
 
     .editor-topbar .project-info {
@@ -511,50 +514,68 @@
     }
 
     .btn-save {
-        padding: 10px 25px;
-        background: linear-gradient(135deg, var(--neon-green), #00aa55);
-        color: var(--bg-dark);
+        padding: 12px 28px;
+        background: linear-gradient(135deg, var(--neon-purple), #8a2be2);
+        color: white;
         border: none;
-        border-radius: 8px;
+        border-radius: 10px;
         font-weight: 700;
         cursor: pointer;
         transition: all 0.3s ease;
         display: flex;
         align-items: center;
         gap: 8px;
+        font-size: 0.95rem;
     }
 
     .btn-save:hover {
-        box-shadow: 0 5px 20px rgba(0, 255, 136, 0.4);
+        box-shadow: 0 5px 25px rgba(179, 71, 255, 0.5);
+        transform: translateY(-2px);
     }
 
     .btn-run {
-        padding: 10px 25px;
-        background: linear-gradient(135deg, var(--neon-orange), #ff5500);
-        color: white;
+        padding: 14px 35px;
+        background: linear-gradient(135deg, var(--neon-cyan), var(--neon-green));
+        color: var(--bg-dark);
         border: none;
-        border-radius: 8px;
-        font-weight: 700;
+        border-radius: 10px;
+        font-weight: 800;
         cursor: pointer;
         transition: all 0.3s ease;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
+        font-size: 1.1rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        box-shadow: 0 0 20px rgba(0, 255, 255, 0.3), 0 0 40px rgba(0, 255, 136, 0.2);
+        animation: pulseGlow 2s ease-in-out infinite;
+    }
+
+    @keyframes pulseGlow {
+        0%, 100% {
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3), 0 0 40px rgba(0, 255, 136, 0.2);
+        }
+        50% {
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.5), 0 0 60px rgba(0, 255, 136, 0.4);
+        }
     }
 
     .btn-run:hover {
-        box-shadow: 0 5px 20px rgba(255, 136, 0, 0.4);
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 8px 40px rgba(0, 255, 255, 0.6), 0 0 60px rgba(0, 255, 136, 0.4);
     }
 
     .btn-exit {
-        padding: 10px 20px;
+        padding: 12px 22px;
         background: transparent;
         border: 2px solid var(--text-secondary);
         color: var(--text-secondary);
-        border-radius: 8px;
+        border-radius: 10px;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.3s ease;
+        font-size: 0.95rem;
     }
 
     .btn-exit:hover {
@@ -562,6 +583,7 @@
         color: var(--neon-pink);
     }
 
+    /* ===== EDITOR MAIN - FULL WIDTH CODE PANELS ===== */
     .editor-main {
         display: flex;
         flex: 1;
@@ -569,10 +591,9 @@
     }
 
     .editor-panels {
-        width: 50%;
+        width: 100%;
         display: flex;
-        flex-direction: column;
-        border-right: 2px solid rgba(0, 212, 255, 0.2);
+        flex-direction: row;
         overflow: hidden;
     }
 
@@ -580,27 +601,29 @@
         flex: 1;
         display: flex;
         flex-direction: column;
-        border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+        border-right: 2px solid rgba(0, 212, 255, 0.15);
         overflow: hidden;
+        min-width: 0;
     }
 
     .editor-panel:last-child {
-        border-bottom: none;
+        border-right: none;
     }
 
     .panel-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 10px 15px;
+        padding: 12px 18px;
         background: var(--bg-darker);
-        border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+        border-bottom: 2px solid rgba(0, 212, 255, 0.2);
+        flex-shrink: 0;
     }
 
     .panel-header .lang-badge {
-        padding: 4px 12px;
-        border-radius: 15px;
-        font-size: 0.75rem;
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 0.8rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 1px;
@@ -609,68 +632,54 @@
     .panel-header .lang-badge.html {
         background: rgba(255, 136, 0, 0.2);
         color: var(--neon-orange);
-        border: 1px solid rgba(255, 136, 0, 0.3);
+        border: 1px solid rgba(255, 136, 0, 0.4);
     }
 
     .panel-header .lang-badge.css {
         background: rgba(0, 212, 255, 0.2);
         color: var(--neon-blue);
-        border: 1px solid rgba(0, 212, 255, 0.3);
+        border: 1px solid rgba(0, 212, 255, 0.4);
     }
 
     .panel-header .lang-badge.js {
-        background: rgba(255, 255, 0, 0.2);
-        color: #ffff00;
-        border: 1px solid rgba(255, 255, 0, 0.3);
+        background: rgba(255, 255, 0, 0.15);
+        color: #ffdd00;
+        border: 1px solid rgba(255, 255, 0, 0.4);
+    }
+
+    .panel-header .panel-hint {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        opacity: 0.7;
     }
 
     .code-editor {
         flex: 1;
         width: 100%;
-        padding: 15px;
-        background: var(--bg-darker);
+        padding: 18px;
+        background: var(--bg-editor);
         border: none;
-        color: var(--text-primary);
+        color: #e0e0ff;
         font-family: var(--font-mono);
         font-size: 14px;
-        line-height: 1.6;
+        line-height: 1.7;
         resize: none;
         outline: none;
         tab-size: 2;
     }
 
     .code-editor:focus {
-        background: #0d0d20;
+        background: #0a0a15;
     }
 
-    .preview-panel {
-        width: 50%;
-        display: flex;
-        flex-direction: column;
-        background: var(--bg-darker);
+    .code-editor::placeholder {
+        color: rgba(160, 160, 192, 0.3);
     }
 
-    .preview-header {
-        padding: 10px 15px;
-        background: var(--bg-darker);
-        border-bottom: 1px solid rgba(0, 212, 255, 0.2);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .preview-header h3 {
-        font-size: 0.9rem;
-        color: var(--text-secondary);
-        text-transform: uppercase;
-        letter-spacing: 2px;
-    }
-
-    .preview-frame {
-        flex: 1;
-        width: 100%;
-        border: none;
-        background: white;
+    /* Line number gutter effect */
+    .code-editor {
+        background-image: linear-gradient(to right, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+        background-size: 50px 100%;
     }
 
     /* ===== MODAL ===== */
@@ -680,11 +689,12 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.8);
+        background: rgba(0, 0, 0, 0.85);
         display: none;
         justify-content: center;
         align-items: center;
         z-index: 1000;
+        backdrop-filter: blur(5px);
     }
 
     .modal-overlay.active {
@@ -780,22 +790,49 @@
         }
     }
 
+    /* ===== KEYBOARD SHORTCUTS HINT ===== */
+    .shortcuts-hint {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        background: rgba(10, 10, 26, 0.9);
+        border: 1px solid rgba(0, 212, 255, 0.2);
+        border-radius: 10px;
+        padding: 12px 18px;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        display: none;
+    }
+
+    #editor-view.active .shortcuts-hint {
+        display: block;
+    }
+
+    .shortcuts-hint kbd {
+        background: var(--bg-input);
+        padding: 3px 8px;
+        border-radius: 4px;
+        border: 1px solid rgba(0, 212, 255, 0.3);
+        color: var(--neon-blue);
+        font-family: var(--font-mono);
+        margin: 0 3px;
+    }
+
     /* ===== RESPONSIVE ===== */
-    @media (max-width: 1024px) {
-        .editor-main {
+    @media (max-width: 1200px) {
+        .editor-panels {
             flex-direction: column;
         }
 
-        .editor-panels {
-            width: 100%;
-            height: 50%;
+        .editor-panel {
+            flex: 1;
             border-right: none;
-            border-bottom: 2px solid rgba(0, 212, 255, 0.2);
+            border-bottom: 2px solid rgba(0, 212, 255, 0.15);
+            min-height: 200px;
         }
 
-        .preview-panel {
-            width: 100%;
-            height: 50%;
+        .editor-panel:last-child {
+            border-bottom: none;
         }
     }
 
@@ -817,11 +854,22 @@
         .editor-topbar {
             flex-direction: column;
             gap: 15px;
+            padding: 12px 15px;
         }
 
         .topbar-actions {
             width: 100%;
             justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-run {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .shortcuts-hint {
+            display: none !important;
         }
     }
 </style>
@@ -839,6 +887,12 @@
 
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
+
+    <!-- Keyboard Shortcuts Hint -->
+    <div class="shortcuts-hint">
+        <kbd>Ctrl</kbd>+<kbd>S</kbd> Save &nbsp;&nbsp;
+        <kbd>Ctrl</kbd>+<kbd>Enter</kbd> Run Game
+    </div>
 
     <!-- ===== VIEW 1: AUTHENTICATION ===== -->
     <div id="auth-view" class="view">
@@ -858,11 +912,11 @@
                 <form id="login-form" class="auth-form active">
                     <div class="form-group">
                         <label for="login-username">Username</label>
-                        <input type="text" id="login-username" placeholder="Enter your username" required>
+                        <input type="text" id="login-username" placeholder="Enter your username" required autocomplete="username">
                     </div>
                     <div class="form-group">
                         <label for="login-password">Password</label>
-                        <input type="password" id="login-password" placeholder="Enter your password" required>
+                        <input type="password" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
                     </div>
                     <button type="submit" class="btn btn-primary">Launch Session</button>
                     <div id="login-message" class="auth-message"></div>
@@ -872,15 +926,15 @@
                 <form id="signup-form" class="auth-form">
                     <div class="form-group">
                         <label for="signup-username">Username</label>
-                        <input type="text" id="signup-username" placeholder="Choose a username" required>
+                        <input type="text" id="signup-username" placeholder="Choose a username" required autocomplete="username">
                     </div>
                     <div class="form-group">
                         <label for="signup-password">Password</label>
-                        <input type="password" id="signup-password" placeholder="Create a password" required>
+                        <input type="password" id="signup-password" placeholder="Create a password" required autocomplete="new-password">
                     </div>
                     <div class="form-group">
                         <label for="signup-confirm">Confirm Password</label>
-                        <input type="password" id="signup-confirm" placeholder="Confirm your password" required>
+                        <input type="password" id="signup-confirm" placeholder="Confirm your password" required autocomplete="new-password">
                     </div>
                     <button type="submit" class="btn btn-primary">Create Account</button>
                     <div id="signup-message" class="auth-message"></div>
@@ -917,13 +971,13 @@
                 <span class="save-status" id="save-status">All changes saved</span>
             </div>
             <div class="topbar-actions">
+                <button class="btn-exit" id="btn-exit">← Exit to Hub</button>
                 <button class="btn-save" id="btn-save">
                     <span>💾</span> Save
                 </button>
                 <button class="btn-run" id="btn-run">
-                    <span>▶️</span> Run
+                    <span>🚀</span> Run Game
                 </button>
-                <button class="btn-exit" id="btn-exit">← Exit to Hub</button>
             </div>
         </header>
 
@@ -933,6 +987,7 @@
                 <div class="editor-panel">
                     <div class="panel-header">
                         <span class="lang-badge html">HTML</span>
+                        <span class="panel-hint">Structure</span>
                     </div>
                     <textarea class="code-editor" id="html-editor" placeholder="<!-- Write your HTML here -->" spellcheck="false"></textarea>
                 </div>
@@ -941,6 +996,7 @@
                 <div class="editor-panel">
                     <div class="panel-header">
                         <span class="lang-badge css">CSS</span>
+                        <span class="panel-hint">Styles</span>
                     </div>
                     <textarea class="code-editor" id="css-editor" placeholder="/* Write your CSS here */" spellcheck="false"></textarea>
                 </div>
@@ -949,16 +1005,10 @@
                 <div class="editor-panel">
                     <div class="panel-header">
                         <span class="lang-badge js">JavaScript</span>
+                        <span class="panel-hint">Logic & 3D</span>
                     </div>
                     <textarea class="code-editor" id="js-editor" placeholder="// Write your JavaScript here" spellcheck="false"></textarea>
                 </div>
-            </div>
-
-            <div class="preview-panel">
-                <div class="preview-header">
-                    <h3>🎮 Game Preview</h3>
-                </div>
-                <iframe class="preview-frame" id="preview-frame" sandbox="allow-scripts allow-same-origin"></iframe>
             </div>
         </main>
     </div>
@@ -1009,7 +1059,6 @@
             this.init();
         }
 
-        // Initialize localStorage with empty arrays if not exists
         init() {
             if (!localStorage.getItem(this.USERS_KEY)) {
                 localStorage.setItem(this.USERS_KEY, JSON.stringify([]));
@@ -1019,7 +1068,6 @@
             }
         }
 
-        // Generate unique ID
         generateId() {
             return Date.now().toString(36) + Math.random().toString(36).substr(2);
         }
@@ -1047,7 +1095,7 @@
             const newUser = {
                 id: this.generateId(),
                 username: username,
-                password: password // In real app, this would be hashed
+                password: password
             };
             users.push(newUser);
             this.saveUsers(users);
@@ -1064,7 +1112,6 @@
                 return { success: false, error: 'Invalid password' };
             }
 
-            // Create session
             const session = { userId: user.id, username: user.username };
             localStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
 
@@ -1136,159 +1183,290 @@
             this.saveProjects(filtered);
         }
 
-        // ===== DEFAULT CODE TEMPLATES =====
+        // ===== ROBUST DEFAULT CODE TEMPLATES =====
         getDefaultHTML() {
-            return `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>My Game</title>
-    <style id="game-styles"></style>
-</head>
-<body>
-    <div id="game-container"></div>
-    <script id="game-script"><\/script>
-</body>
-</html>`;
+            return `<!-- GameForge Project - HTML Structure -->
+<div id="game-container"></div>
+
+<!-- You can add UI elements here -->
+<div id="ui-overlay">
+    <h1 id="game-title">🎮 My 3D Game</h1>
+    <p id="instructions">Use mouse to orbit • Scroll to zoom</p>
+</div>`;
         }
 
         getDefaultCSS() {
-            return `/* Game Styles */
+            return `/* GameForge Project - Styles */
+
+/* CRITICAL: Remove all margins and hide overflow for fullscreen games */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-body {
+html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
     overflow: hidden;
-    background: #000;
+    background: #000000;
 }
 
 #game-container {
     width: 100vw;
     height: 100vh;
+    display: block;
 }
 
-canvas {
+#game-container canvas {
     display: block;
+}
+
+/* UI Overlay Styles */
+#ui-overlay {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 100;
+    color: #00ffff;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+    pointer-events: none;
+}
+
+#game-title {
+    font-size: 1.8rem;
+    margin-bottom: 8px;
+    background: linear-gradient(90deg, #00ffff, #00ff88);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+#instructions {
+    font-size: 0.9rem;
+    opacity: 0.7;
+    color: #ffffff;
 }`;
         }
 
         getDefaultJS() {
-            return `// 🎮 GameForge - Three.js 3D Spinning Cube Demo
-// This demonstrates the 3D capability of your game engine!
+            return `// =============================================
+// 🎮 GameForge - Three.js 3D Spinning Cube Demo
+// =============================================
+// This template demonstrates 3D capabilities!
+// Modify this code to create your own game.
 
-// Import Three.js from CDN
-const script = document.createElement('script');
-script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
-script.onload = initGame;
-document.head.appendChild(script);
+// Load Three.js from CDN
+const THREE_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js';
+const ORBIT_CDN = 'https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/OrbitControls.js';
 
-function initGame() {
-    // Scene Setup
+// Load scripts sequentially
+function loadScript(url) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = url;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
+
+// Initialize game after loading Three.js
+async function init() {
+    try {
+        await loadScript(THREE_CDN);
+        await loadScript(ORBIT_CDN);
+        startGame();
+    } catch (error) {
+        console.error('Failed to load Three.js:', error);
+        document.body.innerHTML = '<div style="color: #ff4757; padding: 40px; font-family: monospace;"><h2>⚠️ Failed to load 3D engine</h2><p>Please check your internet connection.</p></div>';
+    }
+}
+
+function startGame() {
+    // ===== SCENE SETUP =====
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0a1a);
+    
+    // Set a nice gradient background color (not black!)
+    scene.background = new THREE.Color(0x1a0a2e);
+    
+    // Add fog for atmosphere
+    scene.fog = new THREE.Fog(0x1a0a2e, 10, 50);
 
-    // Camera
+    // ===== CAMERA =====
     const camera = new THREE.PerspectiveCamera(
-        75,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        1000
+        60,                                     // Field of view
+        window.innerWidth / window.innerHeight, // Aspect ratio
+        0.1,                                    // Near clipping plane
+        1000                                    // Far clipping plane
     );
-    camera.position.z = 5;
+    camera.position.set(0, 2, 6);
 
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    // ===== RENDERER =====
+    const renderer = new THREE.WebGLRenderer({ 
+        antialias: true,
+        alpha: false
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x1a0a2e, 1); // Ensure clear color is set
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    
     document.getElementById('game-container').appendChild(renderer.domElement);
 
-    // Create a Green Cube (The classic demo!)
-    const geometry = new THREE.BoxGeometry(2, 2, 2);
-    const material = new THREE.MeshPhongMaterial({
+    // ===== ORBIT CONTROLS (Optional mouse interaction) =====
+    let controls;
+    if (typeof THREE.OrbitControls !== 'undefined') {
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxDistance = 20;
+        controls.minDistance = 2;
+    }
+
+    // ===== LIGHTING (Essential for visible objects!) =====
+    
+    // Ambient light - soft overall illumination
+    const ambientLight = new THREE.AmbientLight(0x404060, 0.5);
+    scene.add(ambientLight);
+
+    // Directional light - main light source (like the sun)
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(5, 10, 7);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 1024;
+    directionalLight.shadow.mapSize.height = 1024;
+    scene.add(directionalLight);
+
+    // Point light - cyan accent light
+    const pointLight1 = new THREE.PointLight(0x00ffff, 1, 20);
+    pointLight1.position.set(-3, 3, 3);
+    scene.add(pointLight1);
+
+    // Point light - magenta accent light
+    const pointLight2 = new THREE.PointLight(0xff00ff, 0.8, 20);
+    pointLight2.position.set(3, -2, -3);
+    scene.add(pointLight2);
+
+    // ===== CREATE THE SPINNING CUBE =====
+    const cubeGeometry = new THREE.BoxGeometry(2, 2, 2);
+    const cubeMaterial = new THREE.MeshStandardMaterial({
         color: 0x00ff88,
-        shininess: 100,
-        emissive: 0x002211
+        metalness: 0.3,
+        roughness: 0.4,
+        emissive: 0x003322,
+        emissiveIntensity: 0.2
     });
-    const cube = new THREE.Mesh(geometry, material);
+    const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+    cube.castShadow = true;
+    cube.receiveShadow = true;
+    cube.position.y = 1;
     scene.add(cube);
 
-    // Add some edge glow
-    const edges = new THREE.EdgesGeometry(geometry);
-    const lineMaterial = new THREE.LineBasicMaterial({ 
+    // Add glowing edges to the cube
+    const edgesGeometry = new THREE.EdgesGeometry(cubeGeometry);
+    const edgesMaterial = new THREE.LineBasicMaterial({ 
         color: 0x00ffff,
         linewidth: 2
     });
-    const wireframe = new THREE.LineSegments(edges, lineMaterial);
-    cube.add(wireframe);
+    const edges = new THREE.LineSegments(edgesGeometry, edgesMaterial);
+    cube.add(edges);
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
-    scene.add(ambientLight);
+    // ===== CREATE A FLOOR/GROUND =====
+    const floorGeometry = new THREE.PlaneGeometry(30, 30);
+    const floorMaterial = new THREE.MeshStandardMaterial({
+        color: 0x1a1a3a,
+        metalness: 0.8,
+        roughness: 0.2
+    });
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.5;
+    floor.receiveShadow = true;
+    scene.add(floor);
 
-    const pointLight = new THREE.PointLight(0x00d4ff, 1, 100);
-    pointLight.position.set(5, 5, 5);
-    scene.add(pointLight);
+    // Add grid helper for visual reference
+    const gridHelper = new THREE.GridHelper(30, 30, 0x00ffff, 0x1a1a3a);
+    gridHelper.position.y = -0.49;
+    scene.add(gridHelper);
 
-    const pointLight2 = new THREE.PointLight(0xb347ff, 0.8, 100);
-    pointLight2.position.set(-5, -5, 5);
-    scene.add(pointLight2);
-
-    // Add floating particles
+    // ===== PARTICLE SYSTEM (Stars) =====
+    const particleCount = 1000;
     const particleGeometry = new THREE.BufferGeometry();
-    const particleCount = 500;
     const positions = new Float32Array(particleCount * 3);
     
     for (let i = 0; i < particleCount * 3; i += 3) {
-        positions[i] = (Math.random() - 0.5) * 20;
-        positions[i + 1] = (Math.random() - 0.5) * 20;
-        positions[i + 2] = (Math.random() - 0.5) * 20;
+        positions[i] = (Math.random() - 0.5) * 50;
+        positions[i + 1] = Math.random() * 25;
+        positions[i + 2] = (Math.random() - 0.5) * 50;
     }
     
-    particleGeometry.setAttribute('position', 
-        new THREE.BufferAttribute(positions, 3)
-    );
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     
     const particleMaterial = new THREE.PointsMaterial({
-        color: 0x00d4ff,
-        size: 0.05,
+        color: 0xffffff,
+        size: 0.1,
         transparent: true,
-        opacity: 0.8
+        opacity: 0.8,
+        sizeAttenuation: true
     });
     
     const particles = new THREE.Points(particleGeometry, particleMaterial);
     scene.add(particles);
 
-    // Animation Loop
-    function animate() {
-        requestAnimationFrame(animate);
-
-        // Rotate the cube
-        cube.rotation.x += 0.01;
-        cube.rotation.y += 0.015;
-
-        // Rotate particles slowly
-        particles.rotation.y += 0.001;
-
-        // Render
-        renderer.render(scene, camera);
-    }
-
-    // Handle window resize
-    window.addEventListener('resize', () => {
+    // ===== HANDLE WINDOW RESIZE =====
+    function onWindowResize() {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+    }
+    window.addEventListener('resize', onWindowResize);
 
-    // Start animation
+    // ===== ANIMATION LOOP =====
+    const clock = new THREE.Clock();
+    
+    function animate() {
+        requestAnimationFrame(animate);
+        
+        const elapsedTime = clock.getElapsedTime();
+        
+        // Rotate the cube
+        cube.rotation.x = elapsedTime * 0.5;
+        cube.rotation.y = elapsedTime * 0.8;
+        
+        // Floating animation
+        cube.position.y = 1 + Math.sin(elapsedTime) * 0.3;
+        
+        // Slowly rotate particles
+        particles.rotation.y = elapsedTime * 0.02;
+        
+        // Animate point lights
+        pointLight1.position.x = Math.sin(elapsedTime) * 4;
+        pointLight1.position.z = Math.cos(elapsedTime) * 4;
+        
+        // Update controls if available
+        if (controls) {
+            controls.update();
+        }
+        
+        // Render the scene
+        renderer.render(scene, camera);
+    }
+
+    // Start the animation loop
     animate();
 
-    console.log('🎮 GameForge 3D Engine Initialized!');
-    console.log('✨ Modify this code to create your own game!');
-}`;
+    // Log success message
+    console.log('🎮 GameForge 3D Engine initialized successfully!');
+    console.log('✨ Modify this code to build your own game!');
+}
+
+// Start initialization
+init();`;
         }
     }
 
@@ -1301,20 +1479,17 @@ function initGame() {
         currentProject: null,
         projectToDelete: null,
 
-        // DOM Elements
         views: {
             auth: document.querySelector('#auth-view'),
             hub: document.querySelector('#hub-view'),
             editor: document.querySelector('#editor-view')
         },
 
-        // Initialize the application
         init() {
             this.bindEvents();
             this.checkSession();
         },
 
-        // Check for existing session on page load
         checkSession() {
             const session = this.backend.getCurrentSession();
             if (session) {
@@ -1326,7 +1501,6 @@ function initGame() {
             }
         },
 
-        // Switch between views
         showView(viewName) {
             Object.values(this.views).forEach(view => view.classList.remove('active'));
             
@@ -1341,7 +1515,6 @@ function initGame() {
             }
         },
 
-        // Show toast notification
         showToast(message, type = 'info') {
             const container = document.querySelector('#toast-container');
             const toast = document.createElement('div');
@@ -1354,7 +1527,6 @@ function initGame() {
             }, 3000);
         },
 
-        // Bind all event listeners
         bindEvents() {
             // Auth tab switching
             document.querySelectorAll('.auth-tab').forEach(tab => {
@@ -1425,7 +1597,6 @@ function initGame() {
                     messageEl.className = 'auth-message success';
                     messageEl.textContent = 'Account created! You can now login.';
                     
-                    // Switch to login tab
                     setTimeout(() => {
                         document.querySelector('.auth-tab[data-tab="login"]').click();
                         document.querySelector('#login-username').value = username;
@@ -1444,7 +1615,6 @@ function initGame() {
                 this.showView('auth');
                 this.showToast('Logged out successfully', 'info');
                 
-                // Clear forms
                 document.querySelectorAll('.auth-form input').forEach(input => input.value = '');
                 document.querySelectorAll('.auth-message').forEach(msg => msg.className = 'auth-message');
             });
@@ -1503,7 +1673,7 @@ function initGame() {
             });
 
             document.querySelector('#btn-run').addEventListener('click', () => {
-                this.runPreview();
+                this.runGame();
             });
 
             document.querySelector('#btn-exit').addEventListener('click', () => {
@@ -1531,6 +1701,9 @@ function initGame() {
                         const end = editor.selectionEnd;
                         editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
                         editor.selectionStart = editor.selectionEnd = start + 2;
+                        
+                        // Trigger input event for unsaved status
+                        editor.dispatchEvent(new Event('input'));
                     }
                 });
             });
@@ -1546,7 +1719,7 @@ function initGame() {
                     } else if (e.key === 'Enter') {
                         e.preventDefault();
                         if (this.currentProject) {
-                            this.runPreview();
+                            this.runGame();
                         }
                     }
                 }
@@ -1555,12 +1728,12 @@ function initGame() {
             // Enter key in new project modal
             document.querySelector('#new-project-name').addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
+                    e.preventDefault();
                     document.querySelector('#btn-confirm-project').click();
                 }
             });
         },
 
-        // Render project cards in the hub
         renderProjects() {
             const grid = document.querySelector('#projects-grid');
             const projects = this.backend.getUserProjects(this.currentUser.userId);
@@ -1616,7 +1789,6 @@ function initGame() {
             });
         },
 
-        // Open a project in the editor
         openProject(projectId) {
             const project = this.backend.getProjectById(projectId);
             if (!project) {
@@ -1626,13 +1798,11 @@ function initGame() {
 
             this.currentProject = project;
             
-            // Update editor UI
             document.querySelector('#editor-project-name').textContent = project.name;
             document.querySelector('#html-editor').value = project.htmlCode;
             document.querySelector('#css-editor').value = project.cssCode;
             document.querySelector('#js-editor').value = project.jsCode;
 
-            // Reset save status
             const saveStatus = document.querySelector('#save-status');
             saveStatus.textContent = 'All changes saved';
             saveStatus.style.color = '';
@@ -1640,12 +1810,8 @@ function initGame() {
             saveStatus.style.background = '';
 
             this.showView('editor');
-            
-            // Auto-run preview
-            setTimeout(() => this.runPreview(), 100);
         },
 
-        // Save current project
         saveProject() {
             if (!this.currentProject) return;
 
@@ -1659,12 +1825,10 @@ function initGame() {
                 jsCode
             });
 
-            // Update local reference
             this.currentProject.htmlCode = htmlCode;
             this.currentProject.cssCode = cssCode;
             this.currentProject.jsCode = jsCode;
 
-            // Update save status
             const saveStatus = document.querySelector('#save-status');
             saveStatus.textContent = 'All changes saved';
             saveStatus.style.color = 'var(--neon-green)';
@@ -1674,54 +1838,91 @@ function initGame() {
             this.showToast('Project saved! 💾', 'success');
         },
 
-        // Run the game preview
-        runPreview() {
+        // ===== RUN GAME IN NEW TAB =====
+        runGame() {
             const htmlCode = document.querySelector('#html-editor').value;
             const cssCode = document.querySelector('#css-editor').value;
             const jsCode = document.querySelector('#js-editor').value;
 
             // Build the complete HTML document
-            const fullHTML = `
-<!DOCTYPE html>
-<html>
+            const fullHTML = `<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${this.escapeHtml(this.currentProject.name)} - GameForge</title>
     <style>
 ${cssCode}
     </style>
 </head>
 <body>
-    <div id="game-container"></div>
+${htmlCode}
     <script>
+// GameForge Runtime
 (function() {
+    'use strict';
     try {
 ${jsCode}
     } catch(error) {
-        document.body.innerHTML = '<div style="color: #ff4757; padding: 20px; font-family: monospace; background: #1a1a1a; height: 100vh;"><h2>⚠️ JavaScript Error</h2><pre>' + error.message + '</pre></div>';
-        console.error(error);
+        console.error('GameForge Runtime Error:', error);
+        document.body.innerHTML = \`
+            <div style="
+                background: linear-gradient(135deg, #1a0a2e, #0a0a1a);
+                color: #ff4757;
+                padding: 40px;
+                font-family: 'Consolas', monospace;
+                min-height: 100vh;
+                box-sizing: border-box;
+            ">
+                <h1 style="color: #ff4757; margin-bottom: 20px;">⚠️ JavaScript Error</h1>
+                <div style="
+                    background: rgba(255, 71, 87, 0.1);
+                    border: 1px solid #ff4757;
+                    border-radius: 8px;
+                    padding: 20px;
+                    margin-bottom: 20px;
+                ">
+                    <pre style="white-space: pre-wrap; word-break: break-word;">\${error.message}</pre>
+                </div>
+                <p style="color: #a0a0c0;">Check the browser console (F12) for more details.</p>
+            </div>
+        \`;
     }
 })();
     <\/script>
 </body>
 </html>`;
 
-            // Create blob and set iframe source
+            // Create blob and open in new tab
             const blob = new Blob([fullHTML], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             
-            const iframe = document.querySelector('#preview-frame');
+            // Open in new tab
+            const newTab = window.open(url, '_blank');
             
-            // Revoke previous blob URL to prevent memory leaks
-            if (iframe.dataset.blobUrl) {
-                URL.revokeObjectURL(iframe.dataset.blobUrl);
+            if (newTab) {
+                this.showToast('🚀 Game launched in new tab!', 'success');
+                
+                // Clean up blob URL after a delay (give time for tab to load)
+                setTimeout(() => {
+                    URL.revokeObjectURL(url);
+                }, 5000);
+            } else {
+                // Popup was blocked
+                this.showToast('⚠️ Popup blocked! Please allow popups for this site.', 'error');
+                
+                // Fallback: Create a download link
+                const downloadLink = document.createElement('a');
+                downloadLink.href = url;
+                downloadLink.download = this.currentProject.name + '.html';
+                downloadLink.click();
+                
+                setTimeout(() => {
+                    URL.revokeObjectURL(url);
+                }, 1000);
             }
-            
-            iframe.dataset.blobUrl = url;
-            iframe.src = url;
         },
 
-        // Helper: Get time ago string
         getTimeAgo(date) {
             const seconds = Math.floor((new Date() - date) / 1000);
             
@@ -1733,7 +1934,6 @@ ${jsCode}
             return date.toLocaleDateString();
         },
 
-        // Helper: Escape HTML to prevent XSS
         escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;

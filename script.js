@@ -156,16 +156,10 @@ gl.enableVertexAttribArray(colorLocation);
 gl.vertexAttribPointer(colorLocation, 4, gl.FLOAT, false, 0, 0);
 
 // Animation
-let rotation = 0;
-
 function render() {
-    rotation += 0.01;
-    
     gl.clearColor(0.1, 0.1, 0.15, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-    
     requestAnimationFrame(render);
 }
 
@@ -206,30 +200,25 @@ document.addEventListener('keyup', (e) => keys[e.key] = false);
 
 // Game loop
 function update() {
-    // Movement
     if (keys['ArrowUp'] || keys['w']) player.y -= player.speed;
     if (keys['ArrowDown'] || keys['s']) player.y += player.speed;
     if (keys['ArrowLeft'] || keys['a']) player.x -= player.speed;
     if (keys['ArrowRight'] || keys['d']) player.x += player.speed;
     
-    // Keep player in bounds
     player.x = Math.max(player.size, Math.min(canvas.width - player.size, player.x));
     player.y = Math.max(player.size, Math.min(canvas.height - player.size, player.y));
 }
 
 function draw() {
-    // Clear canvas
     ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Draw player
     ctx.beginPath();
     ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
     ctx.fillStyle = player.color;
     ctx.fill();
     ctx.closePath();
     
-    // Draw instructions
     ctx.fillStyle = '#ffffff';
     ctx.font = '18px Arial';
     ctx.fillText('Use WASD or Arrow Keys to move', 20, 30);
@@ -248,43 +237,138 @@ console.log('Canvas game running!');` }
 };
 
 // =============================================
-// AUTHENTICATION
+// INITIALIZATION
 // =============================================
 
-// Check auth state
-supabase.auth.onAuthStateChange(async (event, session) => {
+async function init() {
+    console.log('🚀 Initializing Game Editor...');
+    
+    // Check if Supabase is configured
+    if (typeof supabaseInitialized === 'undefined' || !supabaseInitialized) {
+        console.error('❌ Supabase not configured properly');
+        loadingScreen.classList.add('hidden');
+        loginScreen.classList.remove('hidden');
+        
+        // Show error message on login screen
+        const loginNote = document.querySelector('.login-note');
+        if (loginNote) {
+            loginNote.innerHTML = '<span style="color: #da3633;">⚠️ Please configure Supabase in supabase-config.js</span>';
+        }
+        
+        // Disable login button
+        googleSignInBtn.disabled = true;
+        googleSignInBtn.style.opacity = '0.5';
+        googleSignInBtn.style.cursor = 'not-allowed';
+        return;
+    }
+    
+    try {
+        // Check for existing session
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+            console.error('Session error:', error);
+            throw error;
+        }
+        
+        if (session) {
+            console.log('✅ Existing session found');
+            await handleAuthChange(session);
+        } else {
+            console.log('ℹ️ No session, showing login');
+            showLoginScreen();
+        }
+        
+        // Set up auth state listener for future changes
+        supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('Auth state changed:', event);
+            
+            if (event === 'SIGNED_IN' && session) {
+                await handleAuthChange(session);
+            } else if (event === 'SIGNED_OUT') {
+                showLoginScreen();
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Initialization error:', error);
+        showLoginScreen();
+        showToast('Connection error. Please refresh.', 'error');
+    }
+}
+
+async function handleAuthChange(session) {
     loadingScreen.classList.add('hidden');
     
-    if (session) {
+    if (session && session.user) {
         currentUser = session.user;
         loginScreen.classList.add('hidden');
         mainApp.classList.remove('hidden');
         
-        userAvatar.src = session.user.user_metadata.avatar_url || 'https://via.placeholder.com/32';
-        userName.textContent = session.user.user_metadata.full_name || session.user.email;
+        userAvatar.src = session.user.user_metadata?.avatar_url || 'https://via.placeholder.com/32';
+        userName.textContent = session.user.user_metadata?.full_name || session.user.email || 'User';
         
         await loadProjects();
     } else {
-        currentUser = null;
-        loginScreen.classList.remove('hidden');
-        mainApp.classList.add('hidden');
+        showLoginScreen();
     }
-});
+}
+
+function showLoginScreen() {
+    loadingScreen.classList.add('hidden');
+    loginScreen.classList.remove('hidden');
+    mainApp.classList.add('hidden');
+    currentUser = null;
+    projects = {};
+    currentProject = null;
+    currentFile = null;
+}
+
+// Start initialization when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
+
+// Fallback timeout - if still loading after 5 seconds, show login
+setTimeout(() => {
+    if (!loadingScreen.classList.contains('hidden')) {
+        console.warn('⚠️ Loading timeout - showing login screen');
+        showLoginScreen();
+    }
+}, 5000);
+
+// =============================================
+// AUTHENTICATION
+// =============================================
 
 // Google Sign In
 googleSignInBtn.addEventListener('click', async () => {
+    if (!supabaseInitialized) {
+        showToast('Supabase not configured. Check console for details.', 'error');
+        return;
+    }
+    
     try {
-        const { error } = await supabase.auth.signInWithOAuth({
+        googleSignInBtn.disabled = true;
+        googleSignInBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
+        
+        const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: window.location.origin
+                redirectTo: window.location.origin + window.location.pathname
             }
         });
         
         if (error) throw error;
+        
     } catch (error) {
         console.error('Sign in error:', error);
         showToast('Sign in failed: ' + error.message, 'error');
+        
+        googleSignInBtn.disabled = false;
+        googleSignInBtn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"> Sign in with Google';
     }
 });
 
@@ -298,6 +382,7 @@ signOutBtn.addEventListener('click', async () => {
         currentProject = null;
         currentFile = null;
         showToast('Signed out', 'info');
+        showLoginScreen();
     } catch (error) {
         console.error('Sign out error:', error);
         showToast('Sign out failed', 'error');
@@ -319,19 +404,24 @@ async function loadProjects() {
         if (error) throw error;
         
         projects = {};
-        data.forEach(project => {
-            projects[project.id] = project;
-        });
+        if (data) {
+            data.forEach(project => {
+                projects[project.id] = project;
+            });
+        }
         
         renderProjectList();
         renderArchivedList();
+        console.log(`✅ Loaded ${Object.keys(projects).length} projects`);
     } catch (error) {
         console.error('Load projects error:', error);
-        showToast('Failed to load projects', 'error');
+        showToast('Failed to load projects: ' + error.message, 'error');
     }
 }
 
 async function saveProject(project) {
+    if (!supabaseInitialized || !currentUser) return;
+    
     try {
         const { error } = await supabase
             .from('projects')
@@ -345,6 +435,7 @@ async function saveProject(project) {
             });
         
         if (error) throw error;
+        console.log('✅ Project saved');
     } catch (error) {
         console.error('Save project error:', error);
         showToast('Failed to save project', 'error');
@@ -381,7 +472,7 @@ function renderProjectList() {
     const activeProjects = Object.values(projects).filter(p => !p.archived);
     
     projectList.innerHTML = activeProjects.length === 0 
-        ? '<p class="no-items">No projects yet</p>'
+        ? '<p class="no-items">No projects yet. Create one!</p>'
         : '';
     
     activeProjects.forEach(project => {
@@ -501,7 +592,7 @@ function selectFile(index) {
 }
 
 function addFile(name, type, content = '') {
-    if (!currentProject) return;
+    if (!currentProject) return false;
     
     if (!currentProject.files) {
         currentProject.files = [];
@@ -534,7 +625,7 @@ function getDefaultContent(type) {
 }
 
 function renameFile(index, newName) {
-    if (!currentProject || !currentProject.files[index]) return;
+    if (!currentProject || !currentProject.files[index]) return false;
     
     const file = currentProject.files[index];
     const exists = currentProject.files.some((f, i) => i !== index && f.name === newName && f.type === file.type);
@@ -728,6 +819,10 @@ archiveProjectBtn.addEventListener('click', () => {
     projects[currentProject.id] = currentProject;
     saveProject(currentProject);
     
+    showNoProjectSelected();
+    currentProject = null;
+    currentFile = null;
+    
     renderProjectList();
     renderArchivedList();
     showToast('Project archived', 'success');
@@ -849,7 +944,7 @@ async function createNewProject() {
         showToast('Project created!', 'success');
     } catch (error) {
         console.error('Create project error:', error);
-        showToast('Failed to create project', 'error');
+        showToast('Failed to create project: ' + error.message, 'error');
     }
 }
 
@@ -1015,7 +1110,7 @@ function escapeHtml(text) {
 // Clean up on page unload
 window.addEventListener('beforeunload', () => {
     // Save current file
-    if (currentProject && currentFile !== null && currentProject.files[currentFile]) {
+    if (currentProject && currentFile !== null && currentProject.files && currentProject.files[currentFile]) {
         currentProject.files[currentFile].content = codeEditor.value;
         saveProject(currentProject);
     }

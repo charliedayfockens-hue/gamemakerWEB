@@ -5,54 +5,241 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebGL Game Editor</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <!-- Project Sidebar -->
-        <div class="sidebar">
-            <div class="sidebar-header">
-                <h2>Projects</h2>
-                <button id="newProjectBtn" class="btn-primary">+ New Project</button>
-            </div>
-            <div id="projectList" class="project-list"></div>
-        </div>
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loader"></div>
+        <p>Loading Editor...</p>
+    </div>
 
-        <!-- Editor Area -->
-        <div class="editor-container">
-            <div class="editor-header">
-                <h1 id="projectTitle">Select or Create a Project</h1>
-                <div class="header-actions">
-                    <button id="runBtn" class="btn-run" disabled>▶ Run</button>
-                    <button id="deleteProjectBtn" class="btn-delete" disabled>🗑 Delete</button>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-container">
+            <div class="login-header">
+                <i class="fas fa-gamepad"></i>
+                <h1>WebGL Game Editor</h1>
+                <p>Create, edit, and run your web games</p>
+            </div>
+            <button id="googleSignInBtn" class="google-btn">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+                Sign in with Google
+            </button>
+            <p class="login-note">Your projects sync across all devices</p>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="mainApp" class="main-app hidden">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <i class="fas fa-gamepad"></i>
+                <h1>Game Editor</h1>
+            </div>
+            <div class="header-right">
+                <div class="user-info">
+                    <img id="userAvatar" src="" alt="User">
+                    <span id="userName"></span>
+                </div>
+                <button id="signOutBtn" class="btn-icon" title="Sign Out">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="app-container">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-tabs">
+                    <button class="sidebar-tab active" data-view="projects">
+                        <i class="fas fa-folder"></i> Projects
+                    </button>
+                    <button class="sidebar-tab" data-view="archived">
+                        <i class="fas fa-archive"></i> Archived
+                    </button>
+                </div>
+
+                <div class="sidebar-content">
+                    <div id="projectsView" class="sidebar-view active">
+                        <button id="newProjectBtn" class="btn-new-project">
+                            <i class="fas fa-plus"></i> New Project
+                        </button>
+                        <div id="projectList" class="project-list"></div>
+                    </div>
+                    <div id="archivedView" class="sidebar-view">
+                        <div id="archivedList" class="project-list"></div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Editor Area -->
+            <main class="editor-area">
+                <div id="noProjectSelected" class="no-project">
+                    <i class="fas fa-folder-open"></i>
+                    <h2>No Project Selected</h2>
+                    <p>Create a new project or select an existing one</p>
+                </div>
+
+                <div id="projectEditor" class="project-editor hidden">
+                    <!-- Project Header -->
+                    <div class="project-header">
+                        <div class="project-info">
+                            <h2 id="projectName" contenteditable="false"></h2>
+                            <button id="editProjectNameBtn" class="btn-icon-small" title="Rename Project">
+                                <i class="fas fa-pencil-alt"></i>
+                            </button>
+                        </div>
+                        <div class="project-actions">
+                            <button id="addFileBtn" class="btn-action">
+                                <i class="fas fa-file-plus"></i> Add File
+                            </button>
+                            <button id="downloadProjectBtn" class="btn-action">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                            <button id="archiveProjectBtn" class="btn-action">
+                                <i class="fas fa-archive"></i> Archive
+                            </button>
+                            <button id="deleteProjectBtn" class="btn-action btn-danger">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                            <button id="runProjectBtn" class="btn-run">
+                                <i class="fas fa-play"></i> Run
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- File Tabs -->
+                    <div class="file-tabs-container">
+                        <div id="fileTabs" class="file-tabs"></div>
+                    </div>
+
+                    <!-- Code Editor -->
+                    <div class="code-editor-container">
+                        <textarea id="codeEditor" class="code-editor" placeholder="Select a file to edit..."></textarea>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- New Project Modal -->
+    <div id="newProjectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New Project</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="newProjectName">Project Name</label>
+                    <input type="text" id="newProjectName" placeholder="My Awesome Game" maxlength="50">
+                </div>
+                <div class="form-group">
+                    <label>Starter Template</label>
+                    <div class="template-options">
+                        <label class="template-option">
+                            <input type="radio" name="template" value="blank" checked>
+                            <span class="template-card">
+                                <i class="fas fa-file"></i>
+                                <span>Blank</span>
+                            </span>
+                        </label>
+                        <label class="template-option">
+                            <input type="radio" name="template" value="webgl">
+                            <span class="template-card">
+                                <i class="fas fa-cube"></i>
+                                <span>WebGL</span>
+                            </span>
+                        </label>
+                        <label class="template-option">
+                            <input type="radio" name="template" value="canvas">
+                            <span class="template-card">
+                                <i class="fas fa-paint-brush"></i>
+                                <span>Canvas 2D</span>
+                            </span>
+                        </label>
+                    </div>
                 </div>
             </div>
-
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="html">HTML</button>
-                <button class="tab-btn" data-tab="css">CSS</button>
-                <button class="tab-btn" data-tab="js">JavaScript</button>
-            </div>
-
-            <div class="editor-panels">
-                <textarea id="htmlEditor" class="editor active" placeholder="Write your HTML here..."></textarea>
-                <textarea id="cssEditor" class="editor" placeholder="Write your CSS here..."></textarea>
-                <textarea id="jsEditor" class="editor" placeholder="Write your JavaScript here..."></textarea>
+            <div class="modal-footer">
+                <button class="btn-secondary modal-cancel">Cancel</button>
+                <button id="createProjectBtn" class="btn-primary">Create Project</button>
             </div>
         </div>
     </div>
 
-    <!-- New Project Modal -->
-    <div id="projectModal" class="modal">
+    <!-- New File Modal -->
+    <div id="newFileModal" class="modal">
         <div class="modal-content">
-            <h2>Create New Project</h2>
-            <input type="text" id="projectNameInput" placeholder="Project Name" maxlength="50">
-            <div class="modal-actions">
-                <button id="createProjectBtn" class="btn-primary">Create</button>
-                <button id="cancelModalBtn" class="btn-secondary">Cancel</button>
+            <div class="modal-header">
+                <h2>Add New File</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="newFileName">File Name</label>
+                    <input type="text" id="newFileName" placeholder="script" maxlength="30">
+                </div>
+                <div class="form-group">
+                    <label for="newFileType">File Type</label>
+                    <select id="newFileType">
+                        <option value="js">JavaScript (.js)</option>
+                        <option value="css">CSS (.css)</option>
+                        <option value="html">HTML (.html)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary modal-cancel">Cancel</button>
+                <button id="createFileBtn" class="btn-primary">Add File</button>
             </div>
         </div>
     </div>
 
+    <!-- Rename File Modal -->
+    <div id="renameFileModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Rename File</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="renameFileName">New File Name</label>
+                    <input type="text" id="renameFileName" placeholder="newname" maxlength="30">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary modal-cancel">Cancel</button>
+                <button id="confirmRenameFileBtn" class="btn-primary">Rename</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Context Menu -->
+    <div id="fileContextMenu" class="context-menu">
+        <button class="context-menu-item" data-action="rename">
+            <i class="fas fa-pencil-alt"></i> Rename
+        </button>
+        <button class="context-menu-item" data-action="delete">
+            <i class="fas fa-trash"></i> Delete
+        </button>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- JSZip for downloads -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <!-- App Scripts -->
+    <script src="supabase-config.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

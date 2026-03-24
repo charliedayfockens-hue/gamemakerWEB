@@ -15,17 +15,56 @@
     </div>
 
     <!-- Login Screen -->
-    <div id="loginScreen" class="login-screen">
+    <div id="loginScreen" class="login-screen hidden">
         <div class="login-container">
             <div class="login-header">
                 <i class="fas fa-gamepad"></i>
                 <h1>WebGL Game Editor</h1>
                 <p>Create, edit, and run your web games</p>
             </div>
-            <button id="googleSignInBtn" class="google-btn">
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
-                Sign in with Google
-            </button>
+            
+            <!-- Auth Tabs -->
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="signin">Sign In</button>
+                <button class="auth-tab" data-tab="signup">Sign Up</button>
+            </div>
+            
+            <!-- Sign In Form -->
+            <form id="signinForm" class="auth-form active">
+                <div class="form-group">
+                    <label for="signinEmail">Email</label>
+                    <input type="email" id="signinEmail" placeholder="your@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="signinPassword">Password</label>
+                    <input type="password" id="signinPassword" placeholder="Your password" required>
+                </div>
+                <button type="submit" class="btn-auth">
+                    <i class="fas fa-sign-in-alt"></i> Sign In
+                </button>
+            </form>
+            
+            <!-- Sign Up Form -->
+            <form id="signupForm" class="auth-form">
+                <div class="form-group">
+                    <label for="signupEmail">Email</label>
+                    <input type="email" id="signupEmail" placeholder="your@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">Password</label>
+                    <input type="password" id="signupPassword" placeholder="Min 6 characters" minlength="6" required>
+                </div>
+                <div class="form-group">
+                    <label for="signupConfirm">Confirm Password</label>
+                    <input type="password" id="signupConfirm" placeholder="Confirm password" required>
+                </div>
+                <button type="submit" class="btn-auth">
+                    <i class="fas fa-user-plus"></i> Create Account
+                </button>
+            </form>
+            
+            <p id="authError" class="auth-error"></p>
+            <p id="authSuccess" class="auth-success"></p>
             <p class="login-note">Your projects sync across all devices</p>
         </div>
     </div>
@@ -40,7 +79,7 @@
             </div>
             <div class="header-right">
                 <div class="user-info">
-                    <img id="userAvatar" src="" alt="User">
+                    <i class="fas fa-user-circle"></i>
                     <span id="userName"></span>
                 </div>
                 <button id="signOutBtn" class="btn-icon" title="Sign Out">
@@ -93,7 +132,7 @@
                         </div>
                         <div class="project-actions">
                             <button id="addFileBtn" class="btn-action">
-                                <i class="fas fa-file-plus"></i> Add File
+                                <i class="fas fa-plus"></i> Add File
                             </button>
                             <button id="downloadProjectBtn" class="btn-action">
                                 <i class="fas fa-download"></i> Download
@@ -117,7 +156,7 @@
 
                     <!-- Code Editor -->
                     <div class="code-editor-container">
-                        <textarea id="codeEditor" class="code-editor" placeholder="Select a file to edit..."></textarea>
+                        <textarea id="codeEditor" class="code-editor" placeholder="Select a file to edit..." spellcheck="false"></textarea>
                     </div>
                 </div>
             </main>

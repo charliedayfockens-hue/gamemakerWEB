@@ -1,5 +1,5 @@
 // =============================================
-// WebGL Game Editor - Main Application (Supabase)
+// WebGL Game Editor - Main Application
 // =============================================
 
 // Broadcast Channel for cross-tab communication
@@ -15,9 +15,7 @@ let saveTimeout = null;
 const loadingScreen = document.getElementById('loadingScreen');
 const loginScreen = document.getElementById('loginScreen');
 const mainApp = document.getElementById('mainApp');
-const googleSignInBtn = document.getElementById('googleSignInBtn');
 const signOutBtn = document.getElementById('signOutBtn');
-const userAvatar = document.getElementById('userAvatar');
 const userName = document.getElementById('userName');
 const projectList = document.getElementById('projectList');
 const archivedList = document.getElementById('archivedList');
@@ -26,6 +24,12 @@ const noProjectSelected = document.getElementById('noProjectSelected');
 const projectName = document.getElementById('projectName');
 const fileTabs = document.getElementById('fileTabs');
 const codeEditor = document.getElementById('codeEditor');
+const authError = document.getElementById('authError');
+const authSuccess = document.getElementById('authSuccess');
+
+// Auth Forms
+const signinForm = document.getElementById('signinForm');
+const signupForm = document.getElementById('signupForm');
 
 // Buttons
 const newProjectBtn = document.getElementById('newProjectBtn');
@@ -50,7 +54,7 @@ const templates = {
     blank: {
         files: [
             { name: 'index', type: 'html', content: '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>My Game</title>\n</head>\n<body>\n    <h1>Hello World!</h1>\n</body>\n</html>' },
-            { name: 'style', type: 'css', content: '/* Your styles here */\nbody {\n    margin: 0;\n    padding: 20px;\n    font-family: Arial, sans-serif;\n}' },
+            { name: 'style', type: 'css', content: '/* Your styles here */\nbody {\n    margin: 0;\n    padding: 20px;\n    font-family: Arial, sans-serif;\n    background: #1a1a2e;\n    color: white;\n}' },
             { name: 'script', type: 'js', content: '// Your JavaScript code here\nconsole.log("Hello from JavaScript!");' }
         ]
     },
@@ -67,123 +71,40 @@ if (!gl) {
     throw new Error('WebGL not supported');
 }
 
-// Set canvas size
-function resizeCanvas() {
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+gl.viewport(0, 0, canvas.width, canvas.height);
+
+window.addEventListener('resize', () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     gl.viewport(0, 0, canvas.width, canvas.height);
-}
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
+});
 
-// Vertex shader
-const vsSource = \`
-    attribute vec4 aVertexPosition;
-    attribute vec4 aVertexColor;
-    varying lowp vec4 vColor;
-    void main() {
-        gl_Position = aVertexPosition;
-        vColor = aVertexColor;
-    }
-\`;
+// Clear to a nice color
+gl.clearColor(0.1, 0.2, 0.3, 1.0);
+gl.clear(gl.COLOR_BUFFER_BIT);
 
-// Fragment shader
-const fsSource = \`
-    varying lowp vec4 vColor;
-    void main() {
-        gl_FragColor = vColor;
-    }
-\`;
-
-// Compile shader
-function compileShader(gl, source, type) {
-    const shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error('Shader compile error:', gl.getShaderInfoLog(shader));
-        gl.deleteShader(shader);
-        return null;
-    }
-    return shader;
-}
-
-// Create program
-const vertexShader = compileShader(gl, vsSource, gl.VERTEX_SHADER);
-const fragmentShader = compileShader(gl, fsSource, gl.FRAGMENT_SHADER);
-
-const program = gl.createProgram();
-gl.attachShader(program, vertexShader);
-gl.attachShader(program, fragmentShader);
-gl.linkProgram(program);
-
-if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    console.error('Program link error:', gl.getProgramInfoLog(program));
-}
-
-gl.useProgram(program);
-
-// Create triangle
-const positions = new Float32Array([
-    0.0,  0.5, 0.0,
-   -0.5, -0.5, 0.0,
-    0.5, -0.5, 0.0
-]);
-
-const colors = new Float32Array([
-    1.0, 0.0, 0.0, 1.0,
-    0.0, 1.0, 0.0, 1.0,
-    0.0, 0.0, 1.0, 1.0
-]);
-
-// Position buffer
-const positionBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
-
-const positionLocation = gl.getAttribLocation(program, 'aVertexPosition');
-gl.enableVertexAttribArray(positionLocation);
-gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
-
-// Color buffer
-const colorBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
-
-const colorLocation = gl.getAttribLocation(program, 'aVertexColor');
-gl.enableVertexAttribArray(colorLocation);
-gl.vertexAttribPointer(colorLocation, 4, gl.FLOAT, false, 0, 0);
-
-// Animation
-function render() {
-    gl.clearColor(0.1, 0.1, 0.15, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    requestAnimationFrame(render);
-}
-
-render();
-console.log('WebGL game running!');` }
+console.log('WebGL initialized! Canvas size:', canvas.width, 'x', canvas.height);` }
         ]
     },
     canvas: {
         files: [
             { name: 'index', type: 'html', content: '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>Canvas Game</title>\n</head>\n<body>\n    <canvas id="gameCanvas"></canvas>\n</body>\n</html>' },
             { name: 'style', type: 'css', content: '* {\n    margin: 0;\n    padding: 0;\n    box-sizing: border-box;\n}\n\nbody {\n    overflow: hidden;\n    background: #1a1a2e;\n}\n\n#gameCanvas {\n    display: block;\n}' },
-            { name: 'game', type: 'js', content: `// Canvas 2D Game Setup
+            { name: 'game', type: 'js', content: `// Canvas 2D Game
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// Set canvas size
-function resizeCanvas() {
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+window.addEventListener('resize', () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-}
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
+});
 
-// Game state
+// Player
 const player = {
     x: canvas.width / 2,
     y: canvas.height / 2,
@@ -193,12 +114,9 @@ const player = {
 };
 
 const keys = {};
+document.addEventListener('keydown', e => keys[e.key] = true);
+document.addEventListener('keyup', e => keys[e.key] = false);
 
-// Input handling
-document.addEventListener('keydown', (e) => keys[e.key] = true);
-document.addEventListener('keyup', (e) => keys[e.key] = false);
-
-// Game loop
 function update() {
     if (keys['ArrowUp'] || keys['w']) player.y -= player.speed;
     if (keys['ArrowDown'] || keys['s']) player.y += player.speed;
@@ -217,9 +135,8 @@ function draw() {
     ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
     ctx.fillStyle = player.color;
     ctx.fill();
-    ctx.closePath();
     
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#fff';
     ctx.font = '18px Arial';
     ctx.fillText('Use WASD or Arrow Keys to move', 20, 30);
 }
@@ -230,8 +147,7 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-gameLoop();
-console.log('Canvas game running!');` }
+gameLoop();` }
         ]
     }
 };
@@ -241,24 +157,18 @@ console.log('Canvas game running!');` }
 // =============================================
 
 async function init() {
-    console.log('🚀 Initializing Game Editor...');
+    console.log('🚀 Starting Game Editor...');
     
     // Check if Supabase is configured
-    if (typeof supabaseInitialized === 'undefined' || !supabaseInitialized) {
-        console.error('❌ Supabase not configured properly');
+    if (!supabaseConfigured || !supabase) {
+        console.warn('⚠️ Supabase not configured');
         loadingScreen.classList.add('hidden');
         loginScreen.classList.remove('hidden');
+        authError.textContent = '⚠️ Please configure Supabase in supabase-config.js (see console for help)';
         
-        // Show error message on login screen
-        const loginNote = document.querySelector('.login-note');
-        if (loginNote) {
-            loginNote.innerHTML = '<span style="color: #da3633;">⚠️ Please configure Supabase in supabase-config.js</span>';
-        }
-        
-        // Disable login button
-        googleSignInBtn.disabled = true;
-        googleSignInBtn.style.opacity = '0.5';
-        googleSignInBtn.style.cursor = 'not-allowed';
+        // Disable auth forms
+        signinForm.querySelector('button').disabled = true;
+        signupForm.querySelector('button').disabled = true;
         return;
     }
     
@@ -266,52 +176,42 @@ async function init() {
         // Check for existing session
         const { data: { session }, error } = await supabase.auth.getSession();
         
-        if (error) {
-            console.error('Session error:', error);
-            throw error;
-        }
+        if (error) throw error;
         
-        if (session) {
-            console.log('✅ Existing session found');
-            await handleAuthChange(session);
+        if (session && session.user) {
+            console.log('✅ Found existing session');
+            await handleSignIn(session.user);
         } else {
-            console.log('ℹ️ No session, showing login');
+            console.log('ℹ️ No session found, showing login');
             showLoginScreen();
         }
         
-        // Set up auth state listener for future changes
+        // Listen for auth changes
         supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('Auth state changed:', event);
+            console.log('Auth event:', event);
             
-            if (event === 'SIGNED_IN' && session) {
-                await handleAuthChange(session);
+            if (event === 'SIGNED_IN' && session?.user) {
+                await handleSignIn(session.user);
             } else if (event === 'SIGNED_OUT') {
                 showLoginScreen();
             }
         });
         
     } catch (error) {
-        console.error('❌ Initialization error:', error);
+        console.error('Init error:', error);
         showLoginScreen();
-        showToast('Connection error. Please refresh.', 'error');
     }
 }
 
-async function handleAuthChange(session) {
+async function handleSignIn(user) {
+    currentUser = user;
     loadingScreen.classList.add('hidden');
+    loginScreen.classList.add('hidden');
+    mainApp.classList.remove('hidden');
     
-    if (session && session.user) {
-        currentUser = session.user;
-        loginScreen.classList.add('hidden');
-        mainApp.classList.remove('hidden');
-        
-        userAvatar.src = session.user.user_metadata?.avatar_url || 'https://via.placeholder.com/32';
-        userName.textContent = session.user.user_metadata?.full_name || session.user.email || 'User';
-        
-        await loadProjects();
-    } else {
-        showLoginScreen();
-    }
+    userName.textContent = user.email;
+    
+    await loadProjects();
 }
 
 function showLoginScreen() {
@@ -322,67 +222,141 @@ function showLoginScreen() {
     projects = {};
     currentProject = null;
     currentFile = null;
+    authError.textContent = '';
+    authSuccess.textContent = '';
 }
 
-// Start initialization when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-} else {
-    init();
-}
+// Start the app
+document.addEventListener('DOMContentLoaded', init);
 
-// Fallback timeout - if still loading after 5 seconds, show login
+// Fallback if still loading after 5 seconds
 setTimeout(() => {
     if (!loadingScreen.classList.contains('hidden')) {
-        console.warn('⚠️ Loading timeout - showing login screen');
         showLoginScreen();
     }
 }, 5000);
 
 // =============================================
-// AUTHENTICATION
+// AUTH TABS
 // =============================================
 
-// Google Sign In
-googleSignInBtn.addEventListener('click', async () => {
-    if (!supabaseInitialized) {
-        showToast('Supabase not configured. Check console for details.', 'error');
+document.querySelectorAll('.auth-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        const tabName = tab.dataset.tab;
+        
+        document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+        document.getElementById(`${tabName}Form`).classList.add('active');
+        
+        authError.textContent = '';
+        authSuccess.textContent = '';
+    });
+});
+
+// =============================================
+// SIGN IN
+// =============================================
+
+signinForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    if (!supabaseConfigured) {
+        authError.textContent = 'Supabase not configured';
         return;
     }
     
+    const email = document.getElementById('signinEmail').value.trim();
+    const password = document.getElementById('signinPassword').value;
+    
+    const btn = signinForm.querySelector('button');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
+    authError.textContent = '';
+    
     try {
-        googleSignInBtn.disabled = true;
-        googleSignInBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
-        
-        const { data, error } = await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-                redirectTo: window.location.origin + window.location.pathname
-            }
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password
         });
         
         if (error) throw error;
         
+        // Success - onAuthStateChange will handle the rest
+        
     } catch (error) {
         console.error('Sign in error:', error);
-        showToast('Sign in failed: ' + error.message, 'error');
-        
-        googleSignInBtn.disabled = false;
-        googleSignInBtn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"> Sign in with Google';
+        authError.textContent = error.message || 'Sign in failed';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
     }
 });
 
-// Sign Out
-signOutBtn.addEventListener('click', async () => {
+// =============================================
+// SIGN UP
+// =============================================
+
+signupForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    if (!supabaseConfigured) {
+        authError.textContent = 'Supabase not configured';
+        return;
+    }
+    
+    const email = document.getElementById('signupEmail').value.trim();
+    const password = document.getElementById('signupPassword').value;
+    const confirm = document.getElementById('signupConfirm').value;
+    
+    if (password !== confirm) {
+        authError.textContent = 'Passwords do not match';
+        return;
+    }
+    
+    if (password.length < 6) {
+        authError.textContent = 'Password must be at least 6 characters';
+        return;
+    }
+    
+    const btn = signupForm.querySelector('button');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating account...';
+    authError.textContent = '';
+    
     try {
-        const { error } = await supabase.auth.signOut();
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password
+        });
+        
         if (error) throw error;
         
-        projects = {};
-        currentProject = null;
-        currentFile = null;
-        showToast('Signed out', 'info');
+        // Check if email confirmation is required
+        if (data.user && !data.session) {
+            authSuccess.textContent = '✓ Account created! Check your email to confirm.';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+        }
+        // If session exists, user is signed in (email confirmation disabled)
+        
+    } catch (error) {
+        console.error('Sign up error:', error);
+        authError.textContent = error.message || 'Sign up failed';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+    }
+});
+
+// =============================================
+// SIGN OUT
+// =============================================
+
+signOutBtn.addEventListener('click', async () => {
+    try {
+        await supabase.auth.signOut();
         showLoginScreen();
+        showToast('Signed out', 'info');
     } catch (error) {
         console.error('Sign out error:', error);
         showToast('Sign out failed', 'error');
@@ -404,23 +378,22 @@ async function loadProjects() {
         if (error) throw error;
         
         projects = {};
-        if (data) {
-            data.forEach(project => {
-                projects[project.id] = project;
-            });
-        }
+        (data || []).forEach(project => {
+            projects[project.id] = project;
+        });
         
         renderProjectList();
         renderArchivedList();
         console.log(`✅ Loaded ${Object.keys(projects).length} projects`);
+        
     } catch (error) {
         console.error('Load projects error:', error);
-        showToast('Failed to load projects: ' + error.message, 'error');
+        showToast('Failed to load projects', 'error');
     }
 }
 
 async function saveProject(project) {
-    if (!supabaseInitialized || !currentUser) return;
+    if (!currentUser) return;
     
     try {
         const { error } = await supabase
@@ -435,10 +408,10 @@ async function saveProject(project) {
             });
         
         if (error) throw error;
-        console.log('✅ Project saved');
+        
     } catch (error) {
-        console.error('Save project error:', error);
-        showToast('Failed to save project', 'error');
+        console.error('Save error:', error);
+        showToast('Failed to save', 'error');
     }
 }
 
@@ -453,7 +426,7 @@ async function deleteProject(projectId) {
         
         delete projects[projectId];
         
-        if (currentProject && currentProject.id === projectId) {
+        if (currentProject?.id === projectId) {
             currentProject = null;
             currentFile = null;
             showNoProjectSelected();
@@ -462,22 +435,23 @@ async function deleteProject(projectId) {
         renderProjectList();
         renderArchivedList();
         showToast('Project deleted', 'success');
+        
     } catch (error) {
-        console.error('Delete project error:', error);
-        showToast('Failed to delete project', 'error');
+        console.error('Delete error:', error);
+        showToast('Failed to delete', 'error');
     }
 }
 
 function renderProjectList() {
-    const activeProjects = Object.values(projects).filter(p => !p.archived);
+    const active = Object.values(projects).filter(p => !p.archived);
     
-    projectList.innerHTML = activeProjects.length === 0 
-        ? '<p class="no-items">No projects yet. Create one!</p>'
+    projectList.innerHTML = active.length === 0 
+        ? '<p class="no-items">No projects yet</p>' 
         : '';
     
-    activeProjects.forEach(project => {
+    active.forEach(project => {
         const item = document.createElement('div');
-        item.className = `project-item ${currentProject && currentProject.id === project.id ? 'active' : ''}`;
+        item.className = `project-item ${currentProject?.id === project.id ? 'active' : ''}`;
         item.innerHTML = `
             <i class="fas fa-folder"></i>
             <span class="project-item-name">${escapeHtml(project.name)}</span>
@@ -488,21 +462,21 @@ function renderProjectList() {
 }
 
 function renderArchivedList() {
-    const archivedProjects = Object.values(projects).filter(p => p.archived);
+    const archived = Object.values(projects).filter(p => p.archived);
     
-    archivedList.innerHTML = archivedProjects.length === 0 
-        ? '<p class="no-items">No archived projects</p>'
+    archivedList.innerHTML = archived.length === 0 
+        ? '<p class="no-items">No archived projects</p>' 
         : '';
     
-    archivedProjects.forEach(project => {
+    archived.forEach(project => {
         const item = document.createElement('div');
-        item.className = `project-item ${currentProject && currentProject.id === project.id ? 'active' : ''}`;
+        item.className = `project-item ${currentProject?.id === project.id ? 'active' : ''}`;
         item.innerHTML = `
             <i class="fas fa-archive"></i>
             <span class="project-item-name">${escapeHtml(project.name)}</span>
             <div class="project-item-actions">
-                <button title="Restore" onclick="event.stopPropagation(); unarchiveProject('${project.id}')">
-                    <i class="fas fa-box-open"></i>
+                <button title="Restore" onclick="event.stopPropagation(); restoreProject('${project.id}')">
+                    <i class="fas fa-undo"></i>
                 </button>
             </div>
         `;
@@ -518,12 +492,10 @@ function selectProject(projectId) {
     if (currentProject) {
         noProjectSelected.classList.add('hidden');
         projectEditor.classList.remove('hidden');
-        
         projectName.textContent = currentProject.name;
         renderFileTabs();
         
-        // Select first file
-        if (currentProject.files && currentProject.files.length > 0) {
+        if (currentProject.files?.length > 0) {
             selectFile(0);
         } else {
             codeEditor.value = '';
@@ -540,6 +512,18 @@ function showNoProjectSelected() {
     projectEditor.classList.add('hidden');
 }
 
+// Global function for restore button
+window.restoreProject = async function(projectId) {
+    const project = projects[projectId];
+    if (!project) return;
+    
+    project.archived = false;
+    await saveProject(project);
+    renderProjectList();
+    renderArchivedList();
+    showToast('Project restored', 'success');
+};
+
 // =============================================
 // FILE MANAGEMENT
 // =============================================
@@ -547,7 +531,7 @@ function showNoProjectSelected() {
 function renderFileTabs() {
     fileTabs.innerHTML = '';
     
-    if (!currentProject || !currentProject.files) return;
+    if (!currentProject?.files) return;
     
     currentProject.files.forEach((file, index) => {
         const tab = document.createElement('div');
@@ -556,30 +540,24 @@ function renderFileTabs() {
             <i class="file-tab-icon ${file.type} ${getFileIcon(file.type)}"></i>
             <span>${escapeHtml(file.name)}.${file.type}</span>
         `;
-        
         tab.addEventListener('click', () => selectFile(index));
         tab.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             showFileContextMenu(e, index);
         });
-        
         fileTabs.appendChild(tab);
     });
 }
 
 function getFileIcon(type) {
-    switch(type) {
-        case 'html': return 'fab fa-html5';
-        case 'css': return 'fab fa-css3-alt';
-        case 'js': return 'fab fa-js-square';
-        default: return 'fas fa-file';
-    }
+    const icons = { html: 'fab fa-html5', css: 'fab fa-css3-alt', js: 'fab fa-js-square' };
+    return icons[type] || 'fas fa-file';
 }
 
 function selectFile(index) {
-    if (!currentProject || !currentProject.files[index]) return;
+    if (!currentProject?.files?.[index]) return;
     
-    // Save current file before switching
+    // Save current file
     if (currentFile !== null && currentProject.files[currentFile]) {
         currentProject.files[currentFile].content = codeEditor.value;
     }
@@ -587,56 +565,48 @@ function selectFile(index) {
     currentFile = index;
     codeEditor.value = currentProject.files[index].content;
     codeEditor.disabled = false;
-    
     renderFileTabs();
 }
 
 function addFile(name, type, content = '') {
     if (!currentProject) return false;
     
-    if (!currentProject.files) {
-        currentProject.files = [];
-    }
+    if (!currentProject.files) currentProject.files = [];
     
-    // Check for duplicate names
-    const exists = currentProject.files.some(f => f.name === name && f.type === type);
-    if (exists) {
-        showToast('A file with this name already exists', 'error');
+    if (currentProject.files.some(f => f.name === name && f.type === type)) {
+        showToast('File already exists', 'error');
         return false;
     }
     
-    currentProject.files.push({ name, type, content: content || getDefaultContent(type) });
-    projects[currentProject.id] = currentProject;
-    saveProject(currentProject);
+    const defaultContent = {
+        html: '<!DOCTYPE html>\n<html>\n<head>\n    <title></title>\n</head>\n<body>\n    \n</body>\n</html>',
+        css: '/* Styles */\n',
+        js: '// JavaScript\n'
+    };
     
+    currentProject.files.push({ 
+        name, 
+        type, 
+        content: content || defaultContent[type] || '' 
+    });
+    
+    saveProject(currentProject);
     renderFileTabs();
     selectFile(currentProject.files.length - 1);
     showToast('File added', 'success');
     return true;
 }
 
-function getDefaultContent(type) {
-    switch(type) {
-        case 'html': return '<!DOCTYPE html>\n<html>\n<head>\n    <title></title>\n</head>\n<body>\n    \n</body>\n</html>';
-        case 'css': return '/* Styles */\n';
-        case 'js': return '// JavaScript\n';
-        default: return '';
-    }
-}
-
 function renameFile(index, newName) {
-    if (!currentProject || !currentProject.files[index]) return false;
+    if (!currentProject?.files?.[index]) return false;
     
     const file = currentProject.files[index];
-    const exists = currentProject.files.some((f, i) => i !== index && f.name === newName && f.type === file.type);
-    
-    if (exists) {
-        showToast('A file with this name already exists', 'error');
+    if (currentProject.files.some((f, i) => i !== index && f.name === newName && f.type === file.type)) {
+        showToast('File name exists', 'error');
         return false;
     }
     
     file.name = newName;
-    projects[currentProject.id] = currentProject;
     saveProject(currentProject);
     renderFileTabs();
     showToast('File renamed', 'success');
@@ -644,15 +614,14 @@ function renameFile(index, newName) {
 }
 
 function deleteFile(index) {
-    if (!currentProject || !currentProject.files[index]) return;
+    if (!currentProject?.files?.[index]) return;
     
     if (currentProject.files.length <= 1) {
-        showToast('Cannot delete the last file', 'error');
+        showToast('Cannot delete last file', 'error');
         return;
     }
     
     currentProject.files.splice(index, 1);
-    projects[currentProject.id] = currentProject;
     saveProject(currentProject);
     
     if (currentFile >= currentProject.files.length) {
@@ -672,16 +641,11 @@ codeEditor.addEventListener('input', () => {
     if (currentProject && currentFile !== null) {
         currentProject.files[currentFile].content = codeEditor.value;
         
-        // Debounced save
         clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(() => {
-            projects[currentProject.id] = currentProject;
-            saveProject(currentProject);
-        }, 1000);
+        saveTimeout = setTimeout(() => saveProject(currentProject), 1000);
     }
 });
 
-// Tab key support
 codeEditor.addEventListener('keydown', (e) => {
     if (e.key === 'Tab') {
         e.preventDefault();
@@ -699,7 +663,7 @@ codeEditor.addEventListener('keydown', (e) => {
 runProjectBtn.addEventListener('click', runProject);
 
 function runProject() {
-    if (!currentProject || !currentProject.files) return;
+    if (!currentProject?.files) return;
     
     // Save current file
     if (currentFile !== null && currentProject.files[currentFile]) {
@@ -707,73 +671,49 @@ function runProject() {
         saveProject(currentProject);
     }
     
-    // Notify other tabs to close their game windows
+    // Close other game windows
     gameChannel.postMessage({ type: 'close_game' });
     
-    // Close current game window if exists
     if (runningGameWindow && !runningGameWindow.closed) {
         runningGameWindow.close();
     }
     
-    // Build the game
-    let htmlContent = '';
-    let cssContent = '';
-    let jsContent = '';
+    // Build HTML
+    let html = '', css = '', js = '';
     
-    // Find main HTML file or first HTML file
     const htmlFile = currentProject.files.find(f => f.type === 'html' && f.name === 'index') 
                   || currentProject.files.find(f => f.type === 'html');
     
-    if (htmlFile) {
-        htmlContent = htmlFile.content;
-    } else {
-        htmlContent = '<!DOCTYPE html><html><head></head><body></body></html>';
-    }
+    html = htmlFile?.content || '<!DOCTYPE html><html><head></head><body></body></html>';
     
-    // Collect all CSS
-    currentProject.files.filter(f => f.type === 'css').forEach(file => {
-        cssContent += `/* ${file.name}.css */\n${file.content}\n\n`;
+    currentProject.files.filter(f => f.type === 'css').forEach(f => {
+        css += `/* ${f.name}.css */\n${f.content}\n\n`;
     });
     
-    // Collect all JS
-    currentProject.files.filter(f => f.type === 'js').forEach(file => {
-        jsContent += `// ${file.name}.js\n${file.content}\n\n`;
+    currentProject.files.filter(f => f.type === 'js').forEach(f => {
+        js += `// ${f.name}.js\n${f.content}\n\n`;
     });
     
-    // Inject CSS and JS into HTML
-    const finalHtml = htmlContent
-        .replace('</head>', `<style>${cssContent}</style></head>`)
-        .replace('</body>', `<script>${jsContent}<\/script></body>`);
+    const finalHtml = html
+        .replace('</head>', `<style>${css}</style></head>`)
+        .replace('</body>', `<script>${js}<\/script></body>`);
     
-    // Open in new window
     runningGameWindow = window.open('', '_blank', 'width=1024,height=768');
     
     if (runningGameWindow) {
         runningGameWindow.document.open();
         runningGameWindow.document.write(finalHtml);
         runningGameWindow.document.close();
-        
         showToast('Game running!', 'success');
-        
-        // Monitor window close
-        const checkClosed = setInterval(() => {
-            if (runningGameWindow && runningGameWindow.closed) {
-                clearInterval(checkClosed);
-                runningGameWindow = null;
-            }
-        }, 1000);
     } else {
-        showToast('Please allow popups to run your game', 'error');
+        showToast('Allow popups to run games', 'error');
     }
 }
 
-// Listen for cross-tab messages
-gameChannel.addEventListener('message', (event) => {
-    if (event.data.type === 'close_game') {
-        if (runningGameWindow && !runningGameWindow.closed) {
-            runningGameWindow.close();
-            runningGameWindow = null;
-        }
+gameChannel.addEventListener('message', (e) => {
+    if (e.data.type === 'close_game' && runningGameWindow && !runningGameWindow.closed) {
+        runningGameWindow.close();
+        runningGameWindow = null;
     }
 });
 
@@ -781,21 +721,15 @@ gameChannel.addEventListener('message', (event) => {
 // DOWNLOAD PROJECT
 // =============================================
 
-downloadProjectBtn.addEventListener('click', downloadProject);
-
-async function downloadProject() {
-    if (!currentProject || !currentProject.files) return;
+downloadProjectBtn.addEventListener('click', async () => {
+    if (!currentProject?.files) return;
     
-    // Save current file first
     if (currentFile !== null && currentProject.files[currentFile]) {
         currentProject.files[currentFile].content = codeEditor.value;
     }
     
     const zip = new JSZip();
-    
-    currentProject.files.forEach(file => {
-        zip.file(`${file.name}.${file.type}`, file.content);
-    });
+    currentProject.files.forEach(f => zip.file(`${f.name}.${f.type}`, f.content));
     
     const blob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(blob);
@@ -805,50 +739,30 @@ async function downloadProject() {
     a.click();
     URL.revokeObjectURL(url);
     
-    showToast('Project downloaded!', 'success');
-}
+    showToast('Downloaded!', 'success');
+});
 
 // =============================================
-// ARCHIVE PROJECT
+// ARCHIVE & DELETE PROJECT
 // =============================================
 
 archiveProjectBtn.addEventListener('click', () => {
     if (!currentProject) return;
     
     currentProject.archived = true;
-    projects[currentProject.id] = currentProject;
     saveProject(currentProject);
-    
     showNoProjectSelected();
     currentProject = null;
     currentFile = null;
-    
     renderProjectList();
     renderArchivedList();
     showToast('Project archived', 'success');
 });
 
-window.unarchiveProject = async function(projectId) {
-    const project = projects[projectId];
-    if (!project) return;
-    
-    project.archived = false;
-    projects[projectId] = project;
-    await saveProject(project);
-    
-    renderProjectList();
-    renderArchivedList();
-    showToast('Project restored', 'success');
-};
-
-// =============================================
-// DELETE PROJECT
-// =============================================
-
 deleteProjectBtn.addEventListener('click', () => {
     if (!currentProject) return;
     
-    if (confirm(`Are you sure you want to delete "${currentProject.name}"? This cannot be undone.`)) {
+    if (confirm(`Delete "${currentProject.name}"? This cannot be undone.`)) {
         deleteProject(currentProject.id);
     }
 });
@@ -860,48 +774,36 @@ deleteProjectBtn.addEventListener('click', () => {
 editProjectNameBtn.addEventListener('click', () => {
     projectName.contentEditable = 'true';
     projectName.focus();
-    
-    // Select all text
-    const range = document.createRange();
-    range.selectNodeContents(projectName);
-    const selection = window.getSelection();
-    selection.removeAllRanges();
-    selection.addRange(range);
+    document.execCommand('selectAll', false, null);
 });
 
-projectName.addEventListener('blur', saveProjectName);
-projectName.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        projectName.blur();
-    }
-    if (e.key === 'Escape') {
-        projectName.textContent = currentProject.name;
-        projectName.blur();
-    }
-});
-
-function saveProjectName() {
+projectName.addEventListener('blur', () => {
     projectName.contentEditable = 'false';
     const newName = projectName.textContent.trim();
     
     if (newName && newName !== currentProject.name) {
         currentProject.name = newName;
-        projects[currentProject.id] = currentProject;
         saveProject(currentProject);
         renderProjectList();
         renderArchivedList();
-        showToast('Project renamed', 'success');
+        showToast('Renamed', 'success');
     } else {
         projectName.textContent = currentProject.name;
     }
-}
+});
+
+projectName.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        projectName.blur();
+    }
+});
 
 // =============================================
 // MODALS
 // =============================================
 
-// New Project Modal
+// New Project
 newProjectBtn.addEventListener('click', () => {
     document.getElementById('newProjectName').value = '';
     document.querySelector('input[name="template"][value="blank"]').checked = true;
@@ -909,46 +811,42 @@ newProjectBtn.addEventListener('click', () => {
     document.getElementById('newProjectName').focus();
 });
 
-document.getElementById('createProjectBtn').addEventListener('click', createNewProject);
-
-async function createNewProject() {
+document.getElementById('createProjectBtn').addEventListener('click', async () => {
     const name = document.getElementById('newProjectName').value.trim();
     const template = document.querySelector('input[name="template"]:checked').value;
     
     if (!name) {
-        showToast('Please enter a project name', 'error');
+        showToast('Enter project name', 'error');
         return;
     }
-    
-    const project = {
-        user_id: currentUser.id,
-        name: name,
-        files: JSON.parse(JSON.stringify(templates[template].files)),
-        archived: false
-    };
     
     try {
         const { data, error } = await supabase
             .from('projects')
-            .insert(project)
+            .insert({
+                user_id: currentUser.id,
+                name,
+                files: JSON.parse(JSON.stringify(templates[template].files)),
+                archived: false
+            })
             .select()
             .single();
         
         if (error) throw error;
         
         projects[data.id] = data;
-        
         closeAllModals();
         renderProjectList();
         selectProject(data.id);
         showToast('Project created!', 'success');
+        
     } catch (error) {
-        console.error('Create project error:', error);
-        showToast('Failed to create project: ' + error.message, 'error');
+        console.error('Create error:', error);
+        showToast('Failed to create project', 'error');
     }
-}
+});
 
-// New File Modal
+// New File
 addFileBtn.addEventListener('click', () => {
     document.getElementById('newFileName').value = '';
     document.getElementById('newFileType').value = 'js';
@@ -961,18 +859,16 @@ document.getElementById('createFileBtn').addEventListener('click', () => {
     const type = document.getElementById('newFileType').value;
     
     if (!name) {
-        showToast('Please enter a file name', 'error');
+        showToast('Enter file name', 'error');
         return;
     }
     
     if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-        showToast('File name can only contain letters, numbers, hyphens, and underscores', 'error');
+        showToast('Invalid file name', 'error');
         return;
     }
     
-    if (addFile(name, type)) {
-        closeAllModals();
-    }
+    if (addFile(name, type)) closeAllModals();
 });
 
 // File Context Menu
@@ -985,9 +881,7 @@ function showFileContextMenu(e, index) {
     fileContextMenu.classList.add('active');
 }
 
-document.addEventListener('click', () => {
-    fileContextMenu.classList.remove('active');
-});
+document.addEventListener('click', () => fileContextMenu.classList.remove('active'));
 
 fileContextMenu.querySelectorAll('.context-menu-item').forEach(item => {
     item.addEventListener('click', () => {
@@ -999,30 +893,21 @@ fileContextMenu.querySelectorAll('.context-menu-item').forEach(item => {
             renameFileModal.classList.add('active');
             document.getElementById('renameFileName').focus();
         } else if (action === 'delete') {
-            if (confirm('Are you sure you want to delete this file?')) {
-                deleteFile(contextMenuFileIndex);
-            }
+            if (confirm('Delete this file?')) deleteFile(contextMenuFileIndex);
         }
     });
 });
 
-// Rename File Modal
+// Rename File
 document.getElementById('confirmRenameFileBtn').addEventListener('click', () => {
     const newName = document.getElementById('renameFileName').value.trim();
     
-    if (!newName) {
-        showToast('Please enter a file name', 'error');
+    if (!newName || !/^[a-zA-Z0-9_-]+$/.test(newName)) {
+        showToast('Invalid name', 'error');
         return;
     }
     
-    if (!/^[a-zA-Z0-9_-]+$/.test(newName)) {
-        showToast('File name can only contain letters, numbers, hyphens, and underscores', 'error');
-        return;
-    }
-    
-    if (renameFile(contextMenuFileIndex, newName)) {
-        closeAllModals();
-    }
+    if (renameFile(contextMenuFileIndex, newName)) closeAllModals();
 });
 
 // Close modals
@@ -1032,21 +917,17 @@ document.querySelectorAll('.modal-close, .modal-cancel').forEach(btn => {
 
 document.querySelectorAll('.modal').forEach(modal => {
     modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeAllModals();
-        }
+        if (e.target === modal) closeAllModals();
     });
 });
 
 function closeAllModals() {
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.classList.remove('active');
-    });
+    document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
 }
 
-// Enter key in modals
+// Enter key shortcuts
 document.getElementById('newProjectName').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') createNewProject();
+    if (e.key === 'Enter') document.getElementById('createProjectBtn').click();
 });
 
 document.getElementById('newFileName').addEventListener('keydown', (e) => {
@@ -1078,15 +959,14 @@ document.querySelectorAll('.sidebar-tab').forEach(tab => {
 // =============================================
 
 function showToast(message, type = 'info') {
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    
     const icons = {
         success: 'fas fa-check-circle',
         error: 'fas fa-exclamation-circle',
         info: 'fas fa-info-circle'
     };
     
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
     toast.innerHTML = `
         <i class="toast-icon ${icons[type]}"></i>
         <span class="toast-message">${escapeHtml(message)}</span>
@@ -1107,15 +987,13 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Clean up on page unload
+// Cleanup on close
 window.addEventListener('beforeunload', () => {
-    // Save current file
-    if (currentProject && currentFile !== null && currentProject.files && currentProject.files[currentFile]) {
+    if (currentProject && currentFile !== null && currentProject.files?.[currentFile]) {
         currentProject.files[currentFile].content = codeEditor.value;
         saveProject(currentProject);
     }
     
-    // Close game window
     if (runningGameWindow && !runningGameWindow.closed) {
         runningGameWindow.close();
     }

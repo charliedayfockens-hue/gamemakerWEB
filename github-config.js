@@ -17,10 +17,10 @@
 
 const GITHUB_CONFIG = {
     // ⬇️ PASTE YOUR GITHUB OAUTH CLIENT ID HERE
-    clientId: 'YOUR_GITHUB_CLIENT_ID_HERE',
+    clientId: '6945536682bf825ff95bc6c7a5c9ab3da9a9049e',
     
     // ⬇️ UPDATE THIS TO YOUR GITHUB PAGES URL
-    redirectUri: 'https://YOUR-USERNAME.github.io/game-editor',
+    redirectUri: 'https://charliedayfockens-hue.github.io/gamemakerWEB/',
     
     // OAuth scopes we need
     scopes: ['gist']

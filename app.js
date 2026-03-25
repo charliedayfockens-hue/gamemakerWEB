@@ -1,5 +1,6 @@
 // =============================================
-// WebGL Game Editor - GitHub Version
+// WebGL Game Editor - GitHub Personal Access Token Version
+// NO OAUTH - NO CONFIG FILE - JUST WORKS!
 // =============================================
 
 const gameChannel = new BroadcastChannel('webgl_game_editor_channel');
@@ -9,14 +10,15 @@ let currentProject = null;
 let currentFile = null;
 let projects = {};
 let saveTimeout = null;
-let syncTimeout = null;
 let accessToken = null;
 
 // DOM Elements
 const loadingScreen = document.getElementById('loadingScreen');
 const loginScreen = document.getElementById('loginScreen');
 const mainApp = document.getElementById('mainApp');
-const githubSignInBtn = document.getElementById('githubSignInBtn');
+const connectBtn = document.getElementById('connectBtn');
+const tokenInput = document.getElementById('tokenInput');
+const loginError = document.getElementById('loginError');
 const signOutBtn = document.getElementById('signOutBtn');
 const syncBtn = document.getElementById('syncBtn');
 const userAvatar = document.getElementById('userAvatar');
@@ -64,110 +66,32 @@ const templates = {
         files: {
             'index.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>WebGL Game</title>\n    <link rel="stylesheet" href="style.css">\n</head>\n<body>\n    <canvas id="glCanvas"></canvas>\n    <script src="main.js"></script>\n</body>\n</html>',
             'style.css': '* {\n    margin: 0;\n    padding: 0;\n    box-sizing: border-box;\n}\n\nbody {\n    overflow: hidden;\n    background: #000;\n}\n\n#glCanvas {\n    display: block;\n    width: 100vw;\n    height: 100vh;\n}',
-            'main.js': `// WebGL Setup
-const canvas = document.getElementById('glCanvas');
-const gl = canvas.getContext('webgl');
-
-if (!gl) {
-    alert('WebGL not supported!');
-}
-
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-gl.viewport(0, 0, canvas.width, canvas.height);
-
-gl.clearColor(0.1, 0.2, 0.3, 1.0);
-gl.clear(gl.COLOR_BUFFER_BIT);
-
-console.log('WebGL ready!');`
+            'main.js': '// WebGL Setup\nconst canvas = document.getElementById("glCanvas");\nconst gl = canvas.getContext("webgl");\n\nif (!gl) {\n    alert("WebGL not supported!");\n}\n\ncanvas.width = window.innerWidth;\ncanvas.height = window.innerHeight;\ngl.viewport(0, 0, canvas.width, canvas.height);\n\ngl.clearColor(0.1, 0.2, 0.3, 1.0);\ngl.clear(gl.COLOR_BUFFER_BIT);\n\nconsole.log("WebGL ready!");'
         }
     },
     canvas: {
         files: {
             'index.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>Canvas Game</title>\n    <link rel="stylesheet" href="style.css">\n</head>\n<body>\n    <canvas id="gameCanvas"></canvas>\n    <script src="game.js"></script>\n</body>\n</html>',
             'style.css': '* {\n    margin: 0;\n    padding: 0;\n}\n\nbody {\n    overflow: hidden;\n    background: #1a1a2e;\n}\n\n#gameCanvas {\n    display: block;\n}',
-            'game.js': `const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-const player = {
-    x: canvas.width / 2,
-    y: canvas.height / 2,
-    size: 30,
-    speed: 5,
-    color: '#00ff88'
-};
-
-const keys = {};
-document.addEventListener('keydown', e => keys[e.key] = true);
-document.addEventListener('keyup', e => keys[e.key] = false);
-
-function update() {
-    if (keys['ArrowUp'] || keys['w']) player.y -= player.speed;
-    if (keys['ArrowDown'] || keys['s']) player.y += player.speed;
-    if (keys['ArrowLeft'] || keys['a']) player.x -= player.speed;
-    if (keys['ArrowRight'] || keys['d']) player.x += player.speed;
-}
-
-function draw() {
-    ctx.fillStyle = '#1a1a2e';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
-    ctx.fillStyle = player.color;
-    ctx.fill();
-    
-    ctx.fillStyle = '#fff';
-    ctx.font = '18px Arial';
-    ctx.fillText('Use WASD or Arrow Keys', 20, 30);
-}
-
-function gameLoop() {
-    update();
-    draw();
-    requestAnimationFrame(gameLoop);
-}
-
-gameLoop();`
+            'game.js': 'const canvas = document.getElementById("gameCanvas");\nconst ctx = canvas.getContext("2d");\n\ncanvas.width = window.innerWidth;\ncanvas.height = window.innerHeight;\n\nconst player = {\n    x: canvas.width / 2,\n    y: canvas.height / 2,\n    size: 30,\n    speed: 5,\n    color: "#00ff88"\n};\n\nconst keys = {};\ndocument.addEventListener("keydown", e => keys[e.key] = true);\ndocument.addEventListener("keyup", e => keys[e.key] = false);\n\nfunction update() {\n    if (keys["ArrowUp"] || keys["w"]) player.y -= player.speed;\n    if (keys["ArrowDown"] || keys["s"]) player.y += player.speed;\n    if (keys["ArrowLeft"] || keys["a"]) player.x -= player.speed;\n    if (keys["ArrowRight"] || keys["d"]) player.x += player.speed;\n}\n\nfunction draw() {\n    ctx.fillStyle = "#1a1a2e";\n    ctx.fillRect(0, 0, canvas.width, canvas.height);\n    \n    ctx.beginPath();\n    ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);\n    ctx.fillStyle = player.color;\n    ctx.fill();\n    \n    ctx.fillStyle = "#fff";\n    ctx.font = "18px Arial";\n    ctx.fillText("Use WASD or Arrow Keys", 20, 30);\n}\n\nfunction gameLoop() {\n    update();\n    draw();\n    requestAnimationFrame(gameLoop);\n}\n\ngameLoop();'
         }
     }
 };
 
 // =============================================
-// GITHUB AUTHENTICATION
+// INITIALIZATION
 // =============================================
 
 async function init() {
-    console.log('🚀 Initializing GitHub Game Editor...');
-    
-    if (!isGitHubConfigured) {
-        loadingScreen.classList.add('hidden');
-        loginScreen.classList.remove('hidden');
-        showToast('Please configure GitHub OAuth in github-config.js', 'error');
-        githubSignInBtn.disabled = true;
-        return;
-    }
-    
-    // Check for OAuth callback
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    
-    if (code) {
-        // OAuth callback - exchange code for token
-        await handleOAuthCallback(code);
-        return;
-    }
+    console.log('🚀 Initializing Game Editor...');
     
     // Check for stored token
     accessToken = localStorage.getItem('github_token');
     
     if (accessToken) {
+        console.log('🔑 Found stored token, validating...');
         try {
             await loadUserData();
-            loadingScreen.classList.add('hidden');
         } catch (error) {
             console.error('Token invalid:', error);
             localStorage.removeItem('github_token');
@@ -175,6 +99,7 @@ async function init() {
             showLoginScreen();
         }
     } else {
+        console.log('ℹ️ No token found, showing login');
         showLoginScreen();
     }
 }
@@ -183,68 +108,82 @@ function showLoginScreen() {
     loadingScreen.classList.add('hidden');
     loginScreen.classList.remove('hidden');
     mainApp.classList.add('hidden');
+    loginError.textContent = '';
 }
 
-githubSignInBtn.addEventListener('click', () => {
-    const authUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CONFIG.clientId}&redirect_uri=${encodeURIComponent(GITHUB_CONFIG.redirectUri)}&scope=${GITHUB_CONFIG.scopes.join(' ')}`;
-    window.location.href = authUrl;
-});
+function showMainApp() {
+    loadingScreen.classList.add('hidden');
+    loginScreen.classList.add('hidden');
+    mainApp.classList.remove('hidden');
+}
 
-async function handleOAuthCallback(code) {
-    try {
-        // For client-side apps, we use cors-anywhere or similar proxy
-        // Alternative: Use your own backend or GitHub Pages + Netlify Functions
-        
-        // For simplicity, we'll use a public CORS proxy (you can replace with your own)
-        const response = await fetch(`https://cors-anywhere.herokuapp.com/https://github.com/login/oauth/access_token`, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                client_id: GITHUB_CONFIG.clientId,
-                code: code,
-                redirect_uri: GITHUB_CONFIG.redirectUri
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.access_token) {
-            accessToken = data.access_token;
-            localStorage.setItem('github_token', accessToken);
-            
-            // Clean URL
-            window.history.replaceState({}, document.title, window.location.pathname);
-            
-            await loadUserData();
-            loadingScreen.classList.add('hidden');
-        } else {
-            throw new Error('Failed to get access token');
-        }
-    } catch (error) {
-        console.error('OAuth error:', error);
-        showToast('Authentication failed. Try again.', 'error');
+// Timeout fallback
+setTimeout(() => {
+    if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
         showLoginScreen();
     }
-}
+}, 5000);
+
+// =============================================
+// AUTHENTICATION
+// =============================================
+
+connectBtn.addEventListener('click', async () => {
+    const token = tokenInput.value.trim();
+    
+    if (!token) {
+        loginError.textContent = 'Please enter your GitHub token';
+        return;
+    }
+    
+    if (!token.startsWith('ghp_') && !token.startsWith('github_pat_')) {
+        loginError.textContent = 'Invalid token format. Token should start with ghp_ or github_pat_';
+        return;
+    }
+    
+    connectBtn.disabled = true;
+    connectBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connecting...';
+    loginError.textContent = '';
+    
+    try {
+        accessToken = token;
+        await loadUserData();
+        
+        // Save token
+        localStorage.setItem('github_token', token);
+        tokenInput.value = '';
+        
+    } catch (error) {
+        console.error('Login error:', error);
+        loginError.textContent = 'Invalid token. Please check and try again.';
+        accessToken = null;
+        
+        connectBtn.disabled = false;
+        connectBtn.innerHTML = '<i class="fab fa-github"></i> Connect to GitHub';
+    }
+});
+
+tokenInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        connectBtn.click();
+    }
+});
 
 async function loadUserData() {
     const response = await githubRequest('/user');
     currentUser = response;
     
-    loginScreen.classList.add('hidden');
-    mainApp.classList.remove('hidden');
-    
     userAvatar.src = currentUser.avatar_url;
     userName.textContent = currentUser.login;
     
+    showMainApp();
     await loadProjects();
+    
+    console.log('✅ Logged in as:', currentUser.login);
 }
 
 signOutBtn.addEventListener('click', () => {
-    if (confirm('Sign out? Unsaved changes will be lost.')) {
+    if (confirm('Sign out?')) {
         localStorage.removeItem('github_token');
         accessToken = null;
         currentUser = null;
@@ -257,40 +196,42 @@ signOutBtn.addEventListener('click', () => {
 });
 
 // =============================================
-// GITHUB API HELPER
+// GITHUB API
 // =============================================
 
 async function githubRequest(endpoint, options = {}) {
-    const url = endpoint.startsWith('http') ? endpoint : `${GITHUB_API.baseUrl}${endpoint}`;
+    const url = endpoint.startsWith('http') ? endpoint : `https://api.github.com${endpoint}`;
     
     const response = await fetch(url, {
         ...options,
         headers: {
             'Authorization': `token ${accessToken}`,
             'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json',
             ...options.headers
         }
     });
     
     if (!response.ok) {
-        throw new Error(`GitHub API error: ${response.status}`);
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || `GitHub API error: ${response.status}`);
     }
     
-    return await response.json();
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
 }
 
 // =============================================
-// PROJECT MANAGEMENT WITH GITHUB GISTS
+// PROJECT MANAGEMENT
 // =============================================
 
 async function loadProjects() {
     try {
-        setEditorStatus('syncing', 'Syncing with GitHub...');
+        setEditorStatus('syncing', 'Syncing...');
         
         const gists = await githubRequest('/gists');
         projects = {};
         
-        // Filter gists that are game editor projects
         for (const gist of gists) {
             if (gist.description && gist.description.startsWith('[GameEditor]')) {
                 const projectData = parseGistToProject(gist);
@@ -302,11 +243,11 @@ async function loadProjects() {
         renderArchivedList();
         setEditorStatus('saved', 'Synced');
         
-        console.log(`✅ Loaded ${Object.keys(projects).length} projects from GitHub`);
+        console.log(`✅ Loaded ${Object.keys(projects).length} projects`);
     } catch (error) {
         console.error('Load projects error:', error);
         setEditorStatus('error', 'Sync failed');
-        showToast('Failed to load projects from GitHub', 'error');
+        showToast('Failed to load projects', 'error');
     }
 }
 
@@ -315,13 +256,16 @@ function parseGistToProject(gist) {
     
     for (const [filename, fileData] of Object.entries(gist.files)) {
         if (filename !== 'project-meta.json') {
-            files[filename] = fileData.content;
+            files[filename] = fileData.content || '';
         }
     }
     
-    const meta = gist.files['project-meta.json'] 
-        ? JSON.parse(gist.files['project-meta.json'].content) 
-        : { archived: false };
+    let meta = { archived: false };
+    if (gist.files['project-meta.json']) {
+        try {
+            meta = JSON.parse(gist.files['project-meta.json'].content);
+        } catch (e) {}
+    }
     
     return {
         id: gist.id,
@@ -341,12 +285,10 @@ async function saveProjectToGithub(project, isNew = false) {
         
         const gistFiles = {};
         
-        // Add all project files
         for (const [filename, content] of Object.entries(project.files)) {
-            gistFiles[filename] = { content };
+            gistFiles[filename] = { content: content || ' ' };
         }
         
-        // Add metadata file
         gistFiles['project-meta.json'] = {
             content: JSON.stringify({
                 description: project.description || '',
@@ -356,10 +298,8 @@ async function saveProjectToGithub(project, isNew = false) {
         };
         
         if (isNew) {
-            // Create new gist
             const response = await githubRequest('/gists', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     description: `[GameEditor] ${project.name}`,
                     public: project.isPublic || false,
@@ -370,13 +310,9 @@ async function saveProjectToGithub(project, isNew = false) {
             project.id = response.id;
             project.gistUrl = response.html_url;
             projects[project.id] = project;
-            
-            showToast('Project created on GitHub!', 'success');
         } else {
-            // Update existing gist
             await githubRequest(`/gists/${project.id}`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     description: `[GameEditor] ${project.name}`,
                     files: gistFiles
@@ -389,31 +325,24 @@ async function saveProjectToGithub(project, isNew = false) {
     } catch (error) {
         console.error('Save error:', error);
         setEditorStatus('error', 'Save failed');
-        showToast('Failed to save to GitHub', 'error');
+        showToast('Failed to save', 'error');
         throw error;
     }
 }
 
 async function deleteProjectFromGithub(projectId) {
     try {
-        await githubRequest(`/gists/${projectId}`, {
-            method: 'DELETE'
-        });
-        
+        await githubRequest(`/gists/${projectId}`, { method: 'DELETE' });
         delete projects[projectId];
-        showToast('Project deleted from GitHub', 'success');
+        showToast('Project deleted', 'success');
     } catch (error) {
         console.error('Delete error:', error);
-        showToast('Failed to delete from GitHub', 'error');
-        throw error;
+        showToast('Failed to delete', 'error');
     }
 }
 
-// =============================================
-// SYNC BUTTON
-// =============================================
-
-syncBtn.addEventListener('click', async () => {
+// Sync button
+syncBtn?.addEventListener('click', async () => {
     syncBtn.classList.add('syncing');
     await loadProjects();
     syncBtn.classList.remove('syncing');
@@ -471,9 +400,10 @@ function selectProject(projectId) {
         projectEditor.classList.remove('hidden');
         projectName.textContent = currentProject.name;
         
-        // Set GitHub link
-        viewOnGitHub.href = currentProject.gistUrl;
-        viewOnGitHub.style.display = 'flex';
+        if (viewOnGitHub) {
+            viewOnGitHub.href = currentProject.gistUrl;
+            viewOnGitHub.style.display = 'flex';
+        }
         
         renderFileTabs();
         
@@ -493,7 +423,7 @@ function selectProject(projectId) {
 function showNoProjectSelected() {
     noProjectSelected.classList.remove('hidden');
     projectEditor.classList.add('hidden');
-    viewOnGitHub.style.display = 'none';
+    if (viewOnGitHub) viewOnGitHub.style.display = 'none';
 }
 
 window.restoreProject = async function(projectId) {
@@ -533,41 +463,23 @@ function renderFileTabs() {
 }
 
 function getFileIcon(ext) {
-    const icons = { 
-        html: 'fab fa-html5', 
-        css: 'fab fa-css3-alt', 
-        js: 'fab fa-js-square' 
-    };
+    const icons = { html: 'fab fa-html5', css: 'fab fa-css3-alt', js: 'fab fa-js-square' };
     return icons[ext] || 'fas fa-file';
 }
 
 function selectFile(filename) {
-    if (!currentProject?.files?.[filename]) return;
+    if (currentProject?.files?.[filename] === undefined) return;
     
     saveCurrentFile();
     currentFile = filename;
-    codeEditor.value = currentProject.files[filename];
+    codeEditor.value = currentProject.files[filename] || '';
     codeEditor.disabled = false;
     renderFileTabs();
 }
 
 function saveCurrentFile() {
-    if (currentProject && currentFile && currentProject.files[currentFile] !== undefined) {
-        const newContent = codeEditor.value;
-        if (currentProject.files[currentFile] !== newContent) {
-            currentProject.files[currentFile] = newContent;
-            
-            // Auto-save to GitHub (debounced)
-            clearTimeout(saveTimeout);
-            setEditorStatus('saving', 'Saving...');
-            saveTimeout = setTimeout(async () => {
-                try {
-                    await saveProjectToGithub(currentProject);
-                } catch (error) {
-                    console.error('Auto-save failed:', error);
-                }
-            }, 2000);
-        }
+    if (currentProject && currentFile && currentProject.files.hasOwnProperty(currentFile)) {
+        currentProject.files[currentFile] = codeEditor.value;
     }
 }
 
@@ -602,6 +514,8 @@ codeEditor.addEventListener('keydown', (e) => {
 });
 
 function setEditorStatus(type, message) {
+    if (!editorStatus) return;
+    
     editorStatus.className = `status-${type}`;
     const icons = {
         saved: 'fas fa-check-circle',
@@ -609,7 +523,7 @@ function setEditorStatus(type, message) {
         syncing: 'fas fa-sync-alt fa-spin',
         error: 'fas fa-exclamation-circle'
     };
-    editorStatus.innerHTML = `<i class="${icons[type]}"></i> ${message}`;
+    editorStatus.innerHTML = `<i class="${icons[type] || 'fas fa-circle'}"></i> ${message}`;
 }
 
 // =============================================
@@ -626,8 +540,7 @@ runProjectBtn.addEventListener('click', () => {
         runningGameWindow.close();
     }
     
-    // Build HTML from all files
-    let html = currentProject.files['index.html'] || '';
+    let html = currentProject.files['index.html'] || '<!DOCTYPE html><html><head></head><body></body></html>';
     let css = '';
     let js = '';
     
@@ -638,6 +551,9 @@ runProjectBtn.addEventListener('click', () => {
             js += `// ${filename}\n${content}\n\n`;
         }
     });
+    
+    html = html.replace(/<link[^>]*href=["'][^"']*\.css["'][^>]*>/gi, '');
+    html = html.replace(/<script[^>]*src=["'][^"']*\.js["'][^>]*><\/script>/gi, '');
     
     const finalHtml = html
         .replace('</head>', `<style>${css}</style></head>`)
@@ -666,7 +582,7 @@ gameChannel.addEventListener('message', (e) => {
 // SHARE PROJECT
 // =============================================
 
-shareProjectBtn.addEventListener('click', () => {
+shareProjectBtn?.addEventListener('click', () => {
     if (!currentProject) return;
     
     document.getElementById('shareUrl').value = currentProject.gistUrl;
@@ -674,11 +590,11 @@ shareProjectBtn.addEventListener('click', () => {
     shareModal.classList.add('active');
 });
 
-document.getElementById('copyUrlBtn').addEventListener('click', () => {
+document.getElementById('copyUrlBtn')?.addEventListener('click', () => {
     const input = document.getElementById('shareUrl');
     input.select();
     document.execCommand('copy');
-    showToast('URL copied to clipboard!', 'success');
+    showToast('URL copied!', 'success');
 });
 
 // =============================================
@@ -811,14 +727,14 @@ document.getElementById('createProjectBtn').addEventListener('click', async () =
         closeAllModals();
         renderProjectList();
         selectProject(project.id);
-        showToast('Project created on GitHub!', 'success');
+        showToast('Project created!', 'success');
         
         btn.disabled = false;
         btn.innerHTML = '<i class="fab fa-github"></i> Create on GitHub';
     } catch (error) {
-        showToast('Failed to create project', 'error');
-        document.getElementById('createProjectBtn').disabled = false;
-        document.getElementById('createProjectBtn').innerHTML = '<i class="fab fa-github"></i> Create on GitHub';
+        const btn = document.getElementById('createProjectBtn');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fab fa-github"></i> Create on GitHub';
     }
 });
 
@@ -869,11 +785,11 @@ function showFileContextMenu(e, filename) {
 document.addEventListener('click', () => fileContextMenu.classList.remove('active'));
 
 fileContextMenu.querySelectorAll('.context-menu-item').forEach(item => {
-    item.addEventListener('click', () => {
+    item.addEventListener('click', async () => {
         const action = item.dataset.action;
         
         if (action === 'rename') {
-            const baseName = contextMenuFile.split('.')[0];
+            const baseName = contextMenuFile.split('.').slice(0, -1).join('.');
             document.getElementById('renameFileName').value = baseName;
             renameFileModal.classList.add('active');
             document.getElementById('renameFileName').focus();
@@ -885,15 +801,14 @@ fileContextMenu.querySelectorAll('.context-menu-item').forEach(item => {
             
             if (confirm('Delete this file?')) {
                 delete currentProject.files[contextMenuFile];
-                saveProjectToGithub(currentProject);
+                await saveProjectToGithub(currentProject);
                 
                 if (currentFile === contextMenuFile) {
-                    const remaining = Object.keys(currentProject.files);
-                    currentFile = remaining[0];
+                    currentFile = Object.keys(currentProject.files)[0];
                 }
                 
                 renderFileTabs();
-                selectFile(currentFile);
+                if (currentFile) selectFile(currentFile);
                 showToast('File deleted', 'success');
             }
         }
@@ -949,15 +864,15 @@ function closeAllModals() {
     document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
 }
 
-document.getElementById('newProjectName').addEventListener('keydown', (e) => {
+document.getElementById('newProjectName')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('createProjectBtn').click();
 });
 
-document.getElementById('newFileName').addEventListener('keydown', (e) => {
+document.getElementById('newFileName')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('createFileBtn').click();
 });
 
-document.getElementById('renameFileName').addEventListener('keydown', (e) => {
+document.getElementById('renameFileName')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('confirmRenameFileBtn').click();
 });
 
@@ -973,7 +888,7 @@ document.querySelectorAll('.sidebar-tab').forEach(tab => {
         tab.classList.add('active');
         
         document.querySelectorAll('.sidebar-view').forEach(v => v.classList.remove('active'));
-        document.getElementById(`${view}View`).classList.add('active');
+        document.getElementById(`${view}View`)?.classList.add('active');
     });
 });
 
@@ -995,7 +910,7 @@ function showToast(message, type = 'info') {
         <span class="toast-message">${escapeHtml(message)}</span>
     `;
     
-    document.getElementById('toastContainer').appendChild(toast);
+    document.getElementById('toastContainer')?.appendChild(toast);
     
     setTimeout(() => {
         toast.style.opacity = '0';
@@ -1022,3 +937,5 @@ window.addEventListener('beforeunload', () => {
 // =============================================
 
 document.addEventListener('DOMContentLoaded', init);
+
+console.log('📝 Game Editor loaded - Personal Access Token version');

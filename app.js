@@ -1,6 +1,6 @@
 // =============================================
 // WebGL Game Editor - GitHub Personal Access Token Version
-// With Account Switching & Token Expiry Handling
+// With Settings, Light/Dark Theme, and Setup Guide
 // =============================================
 
 const gameChannel = new BroadcastChannel('webgl_game_editor_channel');
@@ -11,7 +11,6 @@ let currentFile = null;
 let projects = {};
 let saveTimeout = null;
 let accessToken = null;
-let tokenValid = true;
 
 // =============================================
 // DOM ELEMENTS
@@ -42,6 +41,7 @@ const codeEditor = document.getElementById('codeEditor');
 const editorStatus = document.getElementById('editorStatus');
 const viewOnGitHub = document.getElementById('viewOnGitHub');
 
+// Buttons
 const newProjectBtn = document.getElementById('newProjectBtn');
 const addFileBtn = document.getElementById('addFileBtn');
 const shareProjectBtn = document.getElementById('shareProjectBtn');
@@ -51,6 +51,7 @@ const deleteProjectBtn = document.getElementById('deleteProjectBtn');
 const runProjectBtn = document.getElementById('runProjectBtn');
 const editProjectNameBtn = document.getElementById('editProjectNameBtn');
 
+// Modals
 const newProjectModal = document.getElementById('newProjectModal');
 const shareModal = document.getElementById('shareModal');
 const newFileModal = document.getElementById('newFileModal');
@@ -65,225 +66,26 @@ const fileContextMenu = document.getElementById('fileContextMenu');
 const templates = {
     blank: {
         files: {
-            'index.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>My Game</title>\n    <link rel="stylesheet" href="style.css">\n</head>\n<body>\n    <h1>Hello World!</h1>\n    <script src="script.js"><\/script>\n</body>\n</html>',
+            'index.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>My Game</title>\n    <link rel="stylesheet" href="style.css">\n</head>\n<body>\n    <h1>Hello World!</h1>\n    <script src="script.js"></script>\n</body>\n</html>',
             'style.css': '/* Your styles here */\nbody {\n    margin: 0;\n    padding: 20px;\n    font-family: Arial, sans-serif;\n    background: #1a1a2e;\n    color: white;\n}',
             'script.js': '// Your JavaScript code here\nconsole.log("Hello from JavaScript!");'
         }
     },
     webgl: {
         files: {
-            'index.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>WebGL Game</title>\n    <link rel="stylesheet" href="style.css">\n</head>\n<body>\n    <canvas id="glCanvas"></canvas>\n    <script src="main.js"><\/script>\n</body>\n</html>',
+            'index.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>WebGL Game</title>\n    <link rel="stylesheet" href="style.css">\n</head>\n<body>\n    <canvas id="glCanvas"></canvas>\n    <script src="main.js"></script>\n</body>\n</html>',
             'style.css': '* {\n    margin: 0;\n    padding: 0;\n    box-sizing: border-box;\n}\n\nbody {\n    overflow: hidden;\n    background: #000;\n}\n\n#glCanvas {\n    display: block;\n    width: 100vw;\n    height: 100vh;\n}',
             'main.js': '// WebGL Setup\nconst canvas = document.getElementById("glCanvas");\nconst gl = canvas.getContext("webgl");\n\nif (!gl) {\n    alert("WebGL not supported!");\n}\n\ncanvas.width = window.innerWidth;\ncanvas.height = window.innerHeight;\ngl.viewport(0, 0, canvas.width, canvas.height);\n\ngl.clearColor(0.1, 0.2, 0.3, 1.0);\ngl.clear(gl.COLOR_BUFFER_BIT);\n\nconsole.log("WebGL ready!");'
         }
     },
     canvas: {
         files: {
-            'index.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>Canvas Game</title>\n    <link rel="stylesheet" href="style.css">\n</head>\n<body>\n    <canvas id="gameCanvas"></canvas>\n    <script src="game.js"><\/script>\n</body>\n</html>',
+            'index.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>Canvas Game</title>\n    <link rel="stylesheet" href="style.css">\n</head>\n<body>\n    <canvas id="gameCanvas"></canvas>\n    <script src="game.js"></script>\n</body>\n</html>',
             'style.css': '* {\n    margin: 0;\n    padding: 0;\n}\n\nbody {\n    overflow: hidden;\n    background: #1a1a2e;\n}\n\n#gameCanvas {\n    display: block;\n}',
             'game.js': 'const canvas = document.getElementById("gameCanvas");\nconst ctx = canvas.getContext("2d");\n\ncanvas.width = window.innerWidth;\ncanvas.height = window.innerHeight;\n\nconst player = {\n    x: canvas.width / 2,\n    y: canvas.height / 2,\n    size: 30,\n    speed: 5,\n    color: "#00ff88"\n};\n\nconst keys = {};\ndocument.addEventListener("keydown", e => keys[e.key] = true);\ndocument.addEventListener("keyup", e => keys[e.key] = false);\n\nfunction update() {\n    if (keys["ArrowUp"] || keys["w"]) player.y -= player.speed;\n    if (keys["ArrowDown"] || keys["s"]) player.y += player.speed;\n    if (keys["ArrowLeft"] || keys["a"]) player.x -= player.speed;\n    if (keys["ArrowRight"] || keys["d"]) player.x += player.speed;\n}\n\nfunction draw() {\n    ctx.fillStyle = "#1a1a2e";\n    ctx.fillRect(0, 0, canvas.width, canvas.height);\n    \n    ctx.beginPath();\n    ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);\n    ctx.fillStyle = player.color;\n    ctx.fill();\n    \n    ctx.fillStyle = "#fff";\n    ctx.font = "18px Arial";\n    ctx.fillText("Use WASD or Arrow Keys", 20, 30);\n}\n\nfunction gameLoop() {\n    update();\n    draw();\n    requestAnimationFrame(gameLoop);\n}\n\ngameLoop();'
         }
     }
 };
-
-// =============================================
-// SAVED ACCOUNTS MANAGEMENT
-// =============================================
-
-function getSavedAccounts() {
-    try {
-        return JSON.parse(localStorage.getItem('github_accounts') || '[]');
-    } catch {
-        return [];
-    }
-}
-
-function saveAccount(user, token) {
-    const accounts = getSavedAccounts();
-    
-    // Check if account already exists
-    const existingIndex = accounts.findIndex(a => a.login === user.login);
-    
-    const accountData = {
-        login: user.login,
-        avatar_url: user.avatar_url,
-        token: token,
-        lastUsed: new Date().toISOString()
-    };
-    
-    if (existingIndex >= 0) {
-        accounts[existingIndex] = accountData;
-    } else {
-        accounts.push(accountData);
-    }
-    
-    localStorage.setItem('github_accounts', JSON.stringify(accounts));
-}
-
-function removeAccount(login) {
-    const accounts = getSavedAccounts().filter(a => a.login !== login);
-    localStorage.setItem('github_accounts', JSON.stringify(accounts));
-}
-
-function renderSavedAccounts() {
-    const accounts = getSavedAccounts();
-    const container = document.getElementById('savedAccountsList');
-    
-    if (!container) return;
-    
-    if (accounts.length === 0) {
-        container.innerHTML = '';
-        container.style.display = 'none';
-        return;
-    }
-    
-    container.style.display = 'block';
-    container.innerHTML = `
-        <div class="saved-accounts-header">
-            <h3><i class="fas fa-users"></i> Saved Accounts</h3>
-        </div>
-        <div class="saved-accounts-list">
-            ${accounts.map(account => `
-                <div class="saved-account-item" data-login="${escapeHtml(account.login)}">
-                    <div class="saved-account-info" onclick="loginWithSavedAccount('${escapeHtml(account.login)}')">
-                        <img src="${escapeHtml(account.avatar_url)}" alt="${escapeHtml(account.login)}">
-                        <span>${escapeHtml(account.login)}</span>
-                    </div>
-                    <button class="saved-account-remove" onclick="event.stopPropagation(); removeSavedAccount('${escapeHtml(account.login)}')" title="Remove account">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            `).join('')}
-        </div>
-    `;
-}
-
-window.loginWithSavedAccount = async function(login) {
-    const accounts = getSavedAccounts();
-    const account = accounts.find(a => a.login === login);
-    
-    if (!account) {
-        showToast('Account not found', 'error');
-        return;
-    }
-    
-    // Show loading state
-    const items = document.querySelectorAll('.saved-account-item');
-    items.forEach(item => {
-        if (item.dataset.login === login) {
-            item.classList.add('loading');
-            const info = item.querySelector('.saved-account-info span');
-            if (info) info.textContent = 'Connecting...';
-        }
-    });
-    
-    try {
-        accessToken = account.token;
-        
-        // Validate token
-        const response = await fetch('https://api.github.com/user', {
-            headers: {
-                'Authorization': `token ${accessToken}`,
-                'Accept': 'application/vnd.github.v3+json'
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error('Token expired');
-        }
-        
-        const userData = await response.json();
-        currentUser = userData;
-        
-        // Update saved account data
-        saveAccount(currentUser, accessToken);
-        localStorage.setItem('github_token', accessToken);
-        
-        userAvatar.src = currentUser.avatar_url;
-        userName.textContent = currentUser.login;
-        
-        tokenValid = true;
-        showMainApp();
-        await loadProjects();
-        
-        showToast(`Welcome back, ${currentUser.login}!`, 'success');
-        
-    } catch (error) {
-        console.error('Saved account login error:', error);
-        
-        // Token expired for this saved account
-        renderSavedAccounts();
-        
-        showToast(`Token expired for ${login}. Please enter a new token.`, 'error');
-        
-        // Pre-fill the account name
-        loginError.textContent = `Token for "${login}" has expired. Enter a new token above.`;
-        accessToken = null;
-    }
-};
-
-window.removeSavedAccount = function(login) {
-    if (confirm(`Remove saved account "${login}"?`)) {
-        removeAccount(login);
-        renderSavedAccounts();
-        showToast('Account removed', 'info');
-    }
-};
-
-// =============================================
-// TOKEN EXPIRY HANDLING
-// =============================================
-
-function setTokenInvalid() {
-    tokenValid = false;
-    document.body.classList.add('token-expired');
-    
-    // Show token expired banner
-    let banner = document.getElementById('tokenExpiredBanner');
-    if (!banner) {
-        banner = document.createElement('div');
-        banner.id = 'tokenExpiredBanner';
-        banner.className = 'token-expired-banner';
-        banner.innerHTML = `
-            <div class="banner-content">
-                <i class="fas fa-exclamation-triangle"></i>
-                <span>Your GitHub token has expired or is invalid. Go to Settings to update it.</span>
-                <button onclick="document.getElementById('settingsBtn').click();" class="banner-btn">
-                    <i class="fas fa-cog"></i> Open Settings
-                </button>
-            </div>
-        `;
-        
-        // Insert after header
-        const header = document.querySelector('.app-header');
-        header.parentNode.insertBefore(banner, header.nextSibling);
-    }
-    
-    banner.style.display = 'flex';
-    setEditorStatus('error', 'Token Invalid');
-}
-
-function setTokenValid() {
-    tokenValid = true;
-    document.body.classList.remove('token-expired');
-    
-    const banner = document.getElementById('tokenExpiredBanner');
-    if (banner) {
-        banner.style.display = 'none';
-    }
-    
-    setEditorStatus('saved', 'Synced');
-}
-
-function checkTokenBeforeAction(action) {
-    if (!tokenValid) {
-        showToast('Token invalid! Go to Settings to update it.', 'error');
-        settingsModal.classList.add('active');
-        updateSettingsContent();
-        return false;
-    }
-    return true;
-}
 
 // =============================================
 // THEME MANAGEMENT
@@ -298,6 +100,7 @@ function setTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
     
+    // Update theme buttons
     document.querySelectorAll('.theme-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.theme === theme);
     });
@@ -313,8 +116,10 @@ document.getElementById('themeDarkBtn')?.addEventListener('click', () => setThem
 async function init() {
     console.log('🚀 Initializing Game Editor...');
     
+    // Initialize theme
     initTheme();
     
+    // Check for stored token
     accessToken = localStorage.getItem('github_token');
     
     if (accessToken) {
@@ -323,31 +128,9 @@ async function init() {
             await loadUserData();
         } catch (error) {
             console.error('Token invalid:', error);
-            
-            // Don't remove token - show expired state instead
-            // Check if we have user data cached
-            const accounts = getSavedAccounts();
-            const cachedAccount = accounts.find(a => a.token === accessToken);
-            
-            if (cachedAccount) {
-                // Show main app with expired state
-                currentUser = {
-                    login: cachedAccount.login,
-                    avatar_url: cachedAccount.avatar_url
-                };
-                
-                userAvatar.src = currentUser.avatar_url;
-                userName.textContent = currentUser.login;
-                
-                showMainApp();
-                setTokenInvalid();
-                
-                showToast('Token expired! Update it in Settings.', 'error');
-            } else {
-                localStorage.removeItem('github_token');
-                accessToken = null;
-                showLoginScreen();
-            }
+            localStorage.removeItem('github_token');
+            accessToken = null;
+            showLoginScreen();
         }
     } else {
         console.log('ℹ️ No token found, showing login');
@@ -360,8 +143,6 @@ function showLoginScreen() {
     loginScreen.classList.remove('hidden');
     mainApp.classList.add('hidden');
     loginError.textContent = '';
-    
-    renderSavedAccounts();
 }
 
 function showMainApp() {
@@ -370,6 +151,7 @@ function showMainApp() {
     mainApp.classList.remove('hidden');
 }
 
+// Timeout fallback
 setTimeout(() => {
     if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
         showLoginScreen();
@@ -385,7 +167,7 @@ showSetupGuideBtn?.addEventListener('click', () => {
 });
 
 // =============================================
-// TOKEN VISIBILITY TOGGLE
+// TOKEN VISIBILITY TOGGLE (Login)
 // =============================================
 
 toggleTokenVisibility?.addEventListener('click', () => {
@@ -407,7 +189,7 @@ connectBtn?.addEventListener('click', async () => {
     }
     
     if (!token.startsWith('ghp_') && !token.startsWith('github_pat_')) {
-        loginError.textContent = 'Invalid token. Should start with ghp_ or github_pat_';
+        loginError.textContent = 'Invalid token format. Token should start with ghp_ or github_pat_';
         return;
     }
     
@@ -419,9 +201,8 @@ connectBtn?.addEventListener('click', async () => {
         accessToken = token;
         await loadUserData();
         
-        // Save token and account
+        // Save token
         localStorage.setItem('github_token', token);
-        saveAccount(currentUser, token);
         tokenInput.value = '';
         
     } catch (error) {
@@ -435,7 +216,9 @@ connectBtn?.addEventListener('click', async () => {
 });
 
 tokenInput?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') connectBtn.click();
+    if (e.key === 'Enter') {
+        connectBtn.click();
+    }
 });
 
 async function loadUserData() {
@@ -445,8 +228,6 @@ async function loadUserData() {
     userAvatar.src = currentUser.avatar_url;
     userName.textContent = currentUser.login;
     
-    tokenValid = true;
-    setTokenValid();
     showMainApp();
     await loadProjects();
     
@@ -454,23 +235,15 @@ async function loadUserData() {
 }
 
 signOutBtn?.addEventListener('click', () => {
-    if (confirm('Sign out? Your account will be saved for quick login later.')) {
-        // Keep account saved but remove active token
+    if (confirm('Sign out?')) {
         localStorage.removeItem('github_token');
         accessToken = null;
         currentUser = null;
         projects = {};
         currentProject = null;
         currentFile = null;
-        tokenValid = true;
-        
-        // Remove expired banner if exists
-        const banner = document.getElementById('tokenExpiredBanner');
-        if (banner) banner.style.display = 'none';
-        document.body.classList.remove('token-expired');
-        
         showLoginScreen();
-        showToast('Signed out. Your account is saved for quick login.', 'info');
+        showToast('Signed out', 'info');
     }
 });
 
@@ -478,34 +251,22 @@ signOutBtn?.addEventListener('click', () => {
 // SETTINGS MODAL
 // =============================================
 
-function updateSettingsContent() {
+settingsBtn?.addEventListener('click', () => {
+    // Update settings modal content
     document.getElementById('settingsUserName').textContent = currentUser?.login || 'Unknown';
     document.getElementById('settingsProfileLink').href = `https://github.com/${currentUser?.login}`;
     document.getElementById('settingsTokenDisplay').value = accessToken || '';
     
+    // Update theme buttons
     const currentTheme = localStorage.getItem('theme') || 'dark';
     document.querySelectorAll('.theme-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.theme === currentTheme);
     });
     
-    // Update token status display
-    const tokenStatusEl = document.getElementById('tokenStatusDisplay');
-    if (tokenStatusEl) {
-        if (tokenValid) {
-            tokenStatusEl.innerHTML = '<i class="fas fa-check-circle"></i> Token is valid';
-            tokenStatusEl.className = 'token-status token-status-valid';
-        } else {
-            tokenStatusEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Token is expired or invalid';
-            tokenStatusEl.className = 'token-status token-status-invalid';
-        }
-    }
-}
-
-settingsBtn?.addEventListener('click', () => {
-    updateSettingsContent();
     settingsModal.classList.add('active');
 });
 
+// Token visibility toggle (Settings)
 document.getElementById('toggleSettingsTokenBtn')?.addEventListener('click', () => {
     const input = document.getElementById('settingsTokenDisplay');
     const isPassword = input.type === 'password';
@@ -514,21 +275,24 @@ document.getElementById('toggleSettingsTokenBtn')?.addEventListener('click', () 
         `<i class="fas fa-eye${isPassword ? '-slash' : ''}"></i>`;
 });
 
+// Copy token
 document.getElementById('copyTokenBtn')?.addEventListener('click', () => {
     const input = document.getElementById('settingsTokenDisplay');
     input.type = 'text';
     input.select();
     document.execCommand('copy');
     input.type = 'password';
-    showToast('Token copied!', 'success');
+    showToast('Token copied to clipboard!', 'success');
 });
 
+// Change token button
 document.getElementById('changeTokenBtn')?.addEventListener('click', () => {
     document.getElementById('newTokenInput').value = '';
     document.getElementById('changeTokenError').textContent = '';
     changeTokenModal.classList.add('active');
 });
 
+// Save new token
 document.getElementById('saveNewTokenBtn')?.addEventListener('click', async () => {
     const newToken = document.getElementById('newTokenInput').value.trim();
     const errorEl = document.getElementById('changeTokenError');
@@ -539,7 +303,7 @@ document.getElementById('saveNewTokenBtn')?.addEventListener('click', async () =
     }
     
     if (!newToken.startsWith('ghp_') && !newToken.startsWith('github_pat_')) {
-        errorEl.textContent = 'Invalid format. Should start with ghp_ or github_pat_';
+        errorEl.textContent = 'Invalid token format';
         return;
     }
     
@@ -548,6 +312,7 @@ document.getElementById('saveNewTokenBtn')?.addEventListener('click', async () =
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
     
     try {
+        // Test the new token
         const response = await fetch('https://api.github.com/user', {
             headers: {
                 'Authorization': `token ${newToken}`,
@@ -555,28 +320,22 @@ document.getElementById('saveNewTokenBtn')?.addEventListener('click', async () =
             }
         });
         
-        if (!response.ok) throw new Error('Invalid token');
+        if (!response.ok) {
+            throw new Error('Invalid token');
+        }
         
-        const userData = await response.json();
-        
-        // Token is valid - update everything
+        // Token is valid, save it
         accessToken = newToken;
-        currentUser = userData;
         localStorage.setItem('github_token', newToken);
-        saveAccount(currentUser, newToken);
         
+        // Update user data
+        const userData = await response.json();
+        currentUser = userData;
         userAvatar.src = currentUser.avatar_url;
         userName.textContent = currentUser.login;
         
-        // Restore valid state
-        setTokenValid();
-        
         closeAllModals();
-        
-        // Reload projects
-        await loadProjects();
-        
-        showToast('Token updated! Everything is working again.', 'success');
+        showToast('Token updated successfully!', 'success');
         
     } catch (error) {
         errorEl.textContent = 'Invalid token. Please check and try again.';
@@ -587,7 +346,7 @@ document.getElementById('saveNewTokenBtn')?.addEventListener('click', async () =
 });
 
 // =============================================
-// GITHUB API (with token expiry detection)
+// GITHUB API
 // =============================================
 
 async function githubRequest(endpoint, options = {}) {
@@ -603,12 +362,6 @@ async function githubRequest(endpoint, options = {}) {
         }
     });
     
-    if (response.status === 401 || response.status === 403) {
-        // Token expired or invalid
-        setTokenInvalid();
-        throw new Error('Token expired or invalid');
-    }
-    
     if (!response.ok) {
         const error = await response.json().catch(() => ({}));
         throw new Error(error.message || `GitHub API error: ${response.status}`);
@@ -623,8 +376,6 @@ async function githubRequest(endpoint, options = {}) {
 // =============================================
 
 async function loadProjects() {
-    if (!checkTokenBeforeAction()) return;
-    
     try {
         setEditorStatus('syncing', 'Syncing...');
         
@@ -633,7 +384,8 @@ async function loadProjects() {
         
         for (const gist of gists) {
             if (gist.description && gist.description.startsWith('[GameEditor]')) {
-                projects[gist.id] = parseGistToProject(gist);
+                const projectData = parseGistToProject(gist);
+                projects[gist.id] = projectData;
             }
         }
         
@@ -644,11 +396,6 @@ async function loadProjects() {
         console.log(`✅ Loaded ${Object.keys(projects).length} projects`);
     } catch (error) {
         console.error('Load projects error:', error);
-        
-        if (error.message.includes('Token expired')) {
-            return;
-        }
-        
         setEditorStatus('error', 'Sync failed');
         showToast('Failed to load projects', 'error');
     }
@@ -683,8 +430,6 @@ function parseGistToProject(gist) {
 }
 
 async function saveProjectToGithub(project, isNew = false) {
-    if (!checkTokenBeforeAction()) return;
-    
     try {
         setEditorStatus('saving', 'Saving...');
         
@@ -729,33 +474,25 @@ async function saveProjectToGithub(project, isNew = false) {
         return project;
     } catch (error) {
         console.error('Save error:', error);
-        
-        if (!error.message.includes('Token expired')) {
-            setEditorStatus('error', 'Save failed');
-            showToast('Failed to save', 'error');
-        }
-        
+        setEditorStatus('error', 'Save failed');
+        showToast('Failed to save', 'error');
         throw error;
     }
 }
 
 async function deleteProjectFromGithub(projectId) {
-    if (!checkTokenBeforeAction()) return;
-    
     try {
         await githubRequest(`/gists/${projectId}`, { method: 'DELETE' });
         delete projects[projectId];
         showToast('Project deleted', 'success');
     } catch (error) {
         console.error('Delete error:', error);
-        if (!error.message.includes('Token expired')) {
-            showToast('Failed to delete', 'error');
-        }
+        showToast('Failed to delete', 'error');
     }
 }
 
+// Sync button
 syncBtn?.addEventListener('click', async () => {
-    if (!checkTokenBeforeAction()) return;
     syncBtn.classList.add('syncing');
     await loadProjects();
     syncBtn.classList.remove('syncing');
@@ -840,8 +577,6 @@ function showNoProjectSelected() {
 }
 
 window.restoreProject = async function(projectId) {
-    if (!checkTokenBeforeAction()) return;
-    
     const project = projects[projectId];
     if (!project) return;
     
@@ -909,10 +644,6 @@ codeEditor?.addEventListener('input', () => {
         clearTimeout(saveTimeout);
         setEditorStatus('saving', 'Saving...');
         saveTimeout = setTimeout(async () => {
-            if (!tokenValid) {
-                setEditorStatus('error', 'Token Invalid');
-                return;
-            }
             try {
                 await saveProjectToGithub(currentProject);
             } catch (error) {
@@ -946,7 +677,7 @@ function setEditorStatus(type, message) {
 }
 
 // =============================================
-// RUN PROJECT (works even with expired token - runs locally)
+// RUN PROJECT
 // =============================================
 
 runProjectBtn?.addEventListener('click', () => {
@@ -1017,7 +748,7 @@ document.getElementById('copyUrlBtn')?.addEventListener('click', () => {
 });
 
 // =============================================
-// DOWNLOAD PROJECT (works even with expired token)
+// DOWNLOAD PROJECT
 // =============================================
 
 downloadProjectBtn?.addEventListener('click', async () => {
@@ -1047,7 +778,6 @@ downloadProjectBtn?.addEventListener('click', async () => {
 
 archiveProjectBtn?.addEventListener('click', async () => {
     if (!currentProject) return;
-    if (!checkTokenBeforeAction()) return;
     
     currentProject.archived = true;
     await saveProjectToGithub(currentProject);
@@ -1061,7 +791,6 @@ archiveProjectBtn?.addEventListener('click', async () => {
 
 deleteProjectBtn?.addEventListener('click', async () => {
     if (!currentProject) return;
-    if (!checkTokenBeforeAction()) return;
     
     if (confirm(`Delete "${currentProject.name}" from GitHub? This cannot be undone.`)) {
         const projectId = currentProject.id;
@@ -1079,8 +808,6 @@ deleteProjectBtn?.addEventListener('click', async () => {
 // =============================================
 
 editProjectNameBtn?.addEventListener('click', () => {
-    if (!checkTokenBeforeAction()) return;
-    
     projectName.contentEditable = 'true';
     projectName.focus();
     document.execCommand('selectAll', false, null);
@@ -1091,11 +818,6 @@ projectName?.addEventListener('blur', async () => {
     const newName = projectName.textContent.trim();
     
     if (newName && newName !== currentProject.name) {
-        if (!checkTokenBeforeAction()) {
-            projectName.textContent = currentProject.name;
-            return;
-        }
-        
         currentProject.name = newName;
         await saveProjectToGithub(currentProject);
         renderProjectList();
@@ -1118,8 +840,6 @@ projectName?.addEventListener('keydown', (e) => {
 // =============================================
 
 newProjectBtn?.addEventListener('click', () => {
-    if (!checkTokenBeforeAction()) return;
-    
     document.getElementById('newProjectName').value = '';
     document.getElementById('newProjectDesc').value = '';
     document.getElementById('makePublic').checked = false;
@@ -1129,8 +849,6 @@ newProjectBtn?.addEventListener('click', () => {
 });
 
 document.getElementById('createProjectBtn')?.addEventListener('click', async () => {
-    if (!checkTokenBeforeAction()) return;
-    
     const name = document.getElementById('newProjectName').value.trim();
     const description = document.getElementById('newProjectDesc').value.trim();
     const template = document.querySelector('input[name="template"]:checked').value;
@@ -1175,8 +893,6 @@ document.getElementById('createProjectBtn')?.addEventListener('click', async () 
 // =============================================
 
 addFileBtn?.addEventListener('click', () => {
-    if (!checkTokenBeforeAction()) return;
-    
     document.getElementById('newFileName').value = '';
     document.getElementById('newFileType').value = 'js';
     newFileModal.classList.add('active');
@@ -1184,8 +900,6 @@ addFileBtn?.addEventListener('click', () => {
 });
 
 document.getElementById('createFileBtn')?.addEventListener('click', async () => {
-    if (!checkTokenBeforeAction()) return;
-    
     const name = document.getElementById('newFileName').value.trim();
     const type = document.getElementById('newFileType').value;
     
@@ -1225,15 +939,11 @@ fileContextMenu?.querySelectorAll('.context-menu-item').forEach(item => {
         const action = item.dataset.action;
         
         if (action === 'rename') {
-            if (!checkTokenBeforeAction()) return;
-            
             const baseName = contextMenuFile.split('.').slice(0, -1).join('.');
             document.getElementById('renameFileName').value = baseName;
             renameFileModal.classList.add('active');
             document.getElementById('renameFileName').focus();
         } else if (action === 'delete') {
-            if (!checkTokenBeforeAction()) return;
-            
             if (Object.keys(currentProject.files).length <= 1) {
                 showToast('Cannot delete last file', 'error');
                 return;
@@ -1256,8 +966,6 @@ fileContextMenu?.querySelectorAll('.context-menu-item').forEach(item => {
 });
 
 document.getElementById('confirmRenameFileBtn')?.addEventListener('click', async () => {
-    if (!checkTokenBeforeAction()) return;
-    
     const newBaseName = document.getElementById('renameFileName').value.trim();
     
     if (!newBaseName || !/^[a-zA-Z0-9_-]+$/.test(newBaseName)) {
@@ -1384,4 +1092,4 @@ window.addEventListener('beforeunload', () => {
 
 document.addEventListener('DOMContentLoaded', init);
 
-console.log('📝 Game Editor loaded - Account Switching & Token Expiry');
+console.log('📝 Game Editor loaded - Settings & Theme Support');

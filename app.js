@@ -1,6 +1,6 @@
 // =============================================
 // WebGL Game Editor - GitHub Personal Access Token Version
-// NO OAUTH - NO CONFIG FILE - JUST WORKS!
+// With Settings, Light/Dark Theme, and Setup Guide
 // =============================================
 
 const gameChannel = new BroadcastChannel('webgl_game_editor_channel');
@@ -12,15 +12,23 @@ let projects = {};
 let saveTimeout = null;
 let accessToken = null;
 
-// DOM Elements
+// =============================================
+// DOM ELEMENTS
+// =============================================
+
 const loadingScreen = document.getElementById('loadingScreen');
 const loginScreen = document.getElementById('loginScreen');
 const mainApp = document.getElementById('mainApp');
 const connectBtn = document.getElementById('connectBtn');
 const tokenInput = document.getElementById('tokenInput');
+const toggleTokenVisibility = document.getElementById('toggleTokenVisibility');
 const loginError = document.getElementById('loginError');
+const showSetupGuideBtn = document.getElementById('showSetupGuideBtn');
+const setupGuideModal = document.getElementById('setupGuideModal');
 const signOutBtn = document.getElementById('signOutBtn');
 const syncBtn = document.getElementById('syncBtn');
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsModal = document.getElementById('settingsModal');
 const userAvatar = document.getElementById('userAvatar');
 const userName = document.getElementById('userName');
 const projectList = document.getElementById('projectList');
@@ -48,6 +56,7 @@ const newProjectModal = document.getElementById('newProjectModal');
 const shareModal = document.getElementById('shareModal');
 const newFileModal = document.getElementById('newFileModal');
 const renameFileModal = document.getElementById('renameFileModal');
+const changeTokenModal = document.getElementById('changeTokenModal');
 const fileContextMenu = document.getElementById('fileContextMenu');
 
 // =============================================
@@ -79,11 +88,36 @@ const templates = {
 };
 
 // =============================================
+// THEME MANAGEMENT
+// =============================================
+
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    setTheme(savedTheme);
+}
+
+function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    
+    // Update theme buttons
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.theme === theme);
+    });
+}
+
+document.getElementById('themeLightBtn')?.addEventListener('click', () => setTheme('light'));
+document.getElementById('themeDarkBtn')?.addEventListener('click', () => setTheme('dark'));
+
+// =============================================
 // INITIALIZATION
 // =============================================
 
 async function init() {
     console.log('🚀 Initializing Game Editor...');
+    
+    // Initialize theme
+    initTheme();
     
     // Check for stored token
     accessToken = localStorage.getItem('github_token');
@@ -125,10 +159,28 @@ setTimeout(() => {
 }, 5000);
 
 // =============================================
+// SETUP GUIDE
+// =============================================
+
+showSetupGuideBtn?.addEventListener('click', () => {
+    setupGuideModal.classList.add('active');
+});
+
+// =============================================
+// TOKEN VISIBILITY TOGGLE (Login)
+// =============================================
+
+toggleTokenVisibility?.addEventListener('click', () => {
+    const isPassword = tokenInput.type === 'password';
+    tokenInput.type = isPassword ? 'text' : 'password';
+    toggleTokenVisibility.innerHTML = `<i class="fas fa-eye${isPassword ? '-slash' : ''}"></i>`;
+});
+
+// =============================================
 // AUTHENTICATION
 // =============================================
 
-connectBtn.addEventListener('click', async () => {
+connectBtn?.addEventListener('click', async () => {
     const token = tokenInput.value.trim();
     
     if (!token) {
@@ -163,7 +215,7 @@ connectBtn.addEventListener('click', async () => {
     }
 });
 
-tokenInput.addEventListener('keydown', (e) => {
+tokenInput?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         connectBtn.click();
     }
@@ -182,7 +234,7 @@ async function loadUserData() {
     console.log('✅ Logged in as:', currentUser.login);
 }
 
-signOutBtn.addEventListener('click', () => {
+signOutBtn?.addEventListener('click', () => {
     if (confirm('Sign out?')) {
         localStorage.removeItem('github_token');
         accessToken = null;
@@ -193,6 +245,104 @@ signOutBtn.addEventListener('click', () => {
         showLoginScreen();
         showToast('Signed out', 'info');
     }
+});
+
+// =============================================
+// SETTINGS MODAL
+// =============================================
+
+settingsBtn?.addEventListener('click', () => {
+    // Update settings modal content
+    document.getElementById('settingsUserName').textContent = currentUser?.login || 'Unknown';
+    document.getElementById('settingsProfileLink').href = `https://github.com/${currentUser?.login}`;
+    document.getElementById('settingsTokenDisplay').value = accessToken || '';
+    
+    // Update theme buttons
+    const currentTheme = localStorage.getItem('theme') || 'dark';
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.theme === currentTheme);
+    });
+    
+    settingsModal.classList.add('active');
+});
+
+// Token visibility toggle (Settings)
+document.getElementById('toggleSettingsTokenBtn')?.addEventListener('click', () => {
+    const input = document.getElementById('settingsTokenDisplay');
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+    document.getElementById('toggleSettingsTokenBtn').innerHTML = 
+        `<i class="fas fa-eye${isPassword ? '-slash' : ''}"></i>`;
+});
+
+// Copy token
+document.getElementById('copyTokenBtn')?.addEventListener('click', () => {
+    const input = document.getElementById('settingsTokenDisplay');
+    input.type = 'text';
+    input.select();
+    document.execCommand('copy');
+    input.type = 'password';
+    showToast('Token copied to clipboard!', 'success');
+});
+
+// Change token button
+document.getElementById('changeTokenBtn')?.addEventListener('click', () => {
+    document.getElementById('newTokenInput').value = '';
+    document.getElementById('changeTokenError').textContent = '';
+    changeTokenModal.classList.add('active');
+});
+
+// Save new token
+document.getElementById('saveNewTokenBtn')?.addEventListener('click', async () => {
+    const newToken = document.getElementById('newTokenInput').value.trim();
+    const errorEl = document.getElementById('changeTokenError');
+    
+    if (!newToken) {
+        errorEl.textContent = 'Please enter a token';
+        return;
+    }
+    
+    if (!newToken.startsWith('ghp_') && !newToken.startsWith('github_pat_')) {
+        errorEl.textContent = 'Invalid token format';
+        return;
+    }
+    
+    const btn = document.getElementById('saveNewTokenBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
+    
+    try {
+        // Test the new token
+        const response = await fetch('https://api.github.com/user', {
+            headers: {
+                'Authorization': `token ${newToken}`,
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Invalid token');
+        }
+        
+        // Token is valid, save it
+        accessToken = newToken;
+        localStorage.setItem('github_token', newToken);
+        
+        // Update user data
+        const userData = await response.json();
+        currentUser = userData;
+        userAvatar.src = currentUser.avatar_url;
+        userName.textContent = currentUser.login;
+        
+        closeAllModals();
+        showToast('Token updated successfully!', 'success');
+        
+    } catch (error) {
+        errorEl.textContent = 'Invalid token. Please check and try again.';
+    }
+    
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-save"></i> Save New Token';
 });
 
 // =============================================
@@ -487,7 +637,7 @@ function saveCurrentFile() {
 // CODE EDITOR
 // =============================================
 
-codeEditor.addEventListener('input', () => {
+codeEditor?.addEventListener('input', () => {
     if (currentProject && currentFile) {
         currentProject.files[currentFile] = codeEditor.value;
         
@@ -503,7 +653,7 @@ codeEditor.addEventListener('input', () => {
     }
 });
 
-codeEditor.addEventListener('keydown', (e) => {
+codeEditor?.addEventListener('keydown', (e) => {
     if (e.key === 'Tab') {
         e.preventDefault();
         const start = codeEditor.selectionStart;
@@ -530,7 +680,7 @@ function setEditorStatus(type, message) {
 // RUN PROJECT
 // =============================================
 
-runProjectBtn.addEventListener('click', () => {
+runProjectBtn?.addEventListener('click', () => {
     if (!currentProject?.files) return;
     
     saveCurrentFile();
@@ -601,7 +751,7 @@ document.getElementById('copyUrlBtn')?.addEventListener('click', () => {
 // DOWNLOAD PROJECT
 // =============================================
 
-downloadProjectBtn.addEventListener('click', async () => {
+downloadProjectBtn?.addEventListener('click', async () => {
     if (!currentProject?.files) return;
     
     saveCurrentFile();
@@ -626,7 +776,7 @@ downloadProjectBtn.addEventListener('click', async () => {
 // ARCHIVE & DELETE
 // =============================================
 
-archiveProjectBtn.addEventListener('click', async () => {
+archiveProjectBtn?.addEventListener('click', async () => {
     if (!currentProject) return;
     
     currentProject.archived = true;
@@ -639,7 +789,7 @@ archiveProjectBtn.addEventListener('click', async () => {
     showToast('Project archived', 'success');
 });
 
-deleteProjectBtn.addEventListener('click', async () => {
+deleteProjectBtn?.addEventListener('click', async () => {
     if (!currentProject) return;
     
     if (confirm(`Delete "${currentProject.name}" from GitHub? This cannot be undone.`)) {
@@ -657,13 +807,13 @@ deleteProjectBtn.addEventListener('click', async () => {
 // RENAME PROJECT
 // =============================================
 
-editProjectNameBtn.addEventListener('click', () => {
+editProjectNameBtn?.addEventListener('click', () => {
     projectName.contentEditable = 'true';
     projectName.focus();
     document.execCommand('selectAll', false, null);
 });
 
-projectName.addEventListener('blur', async () => {
+projectName?.addEventListener('blur', async () => {
     projectName.contentEditable = 'false';
     const newName = projectName.textContent.trim();
     
@@ -678,7 +828,7 @@ projectName.addEventListener('blur', async () => {
     }
 });
 
-projectName.addEventListener('keydown', (e) => {
+projectName?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         e.preventDefault();
         projectName.blur();
@@ -689,7 +839,7 @@ projectName.addEventListener('keydown', (e) => {
 // NEW PROJECT
 // =============================================
 
-newProjectBtn.addEventListener('click', () => {
+newProjectBtn?.addEventListener('click', () => {
     document.getElementById('newProjectName').value = '';
     document.getElementById('newProjectDesc').value = '';
     document.getElementById('makePublic').checked = false;
@@ -698,7 +848,7 @@ newProjectBtn.addEventListener('click', () => {
     document.getElementById('newProjectName').focus();
 });
 
-document.getElementById('createProjectBtn').addEventListener('click', async () => {
+document.getElementById('createProjectBtn')?.addEventListener('click', async () => {
     const name = document.getElementById('newProjectName').value.trim();
     const description = document.getElementById('newProjectDesc').value.trim();
     const template = document.querySelector('input[name="template"]:checked').value;
@@ -742,14 +892,14 @@ document.getElementById('createProjectBtn').addEventListener('click', async () =
 // FILE OPERATIONS
 // =============================================
 
-addFileBtn.addEventListener('click', () => {
+addFileBtn?.addEventListener('click', () => {
     document.getElementById('newFileName').value = '';
     document.getElementById('newFileType').value = 'js';
     newFileModal.classList.add('active');
     document.getElementById('newFileName').focus();
 });
 
-document.getElementById('createFileBtn').addEventListener('click', async () => {
+document.getElementById('createFileBtn')?.addEventListener('click', async () => {
     const name = document.getElementById('newFileName').value.trim();
     const type = document.getElementById('newFileType').value;
     
@@ -782,9 +932,9 @@ function showFileContextMenu(e, filename) {
     fileContextMenu.classList.add('active');
 }
 
-document.addEventListener('click', () => fileContextMenu.classList.remove('active'));
+document.addEventListener('click', () => fileContextMenu?.classList.remove('active'));
 
-fileContextMenu.querySelectorAll('.context-menu-item').forEach(item => {
+fileContextMenu?.querySelectorAll('.context-menu-item').forEach(item => {
     item.addEventListener('click', async () => {
         const action = item.dataset.action;
         
@@ -815,7 +965,7 @@ fileContextMenu.querySelectorAll('.context-menu-item').forEach(item => {
     });
 });
 
-document.getElementById('confirmRenameFileBtn').addEventListener('click', async () => {
+document.getElementById('confirmRenameFileBtn')?.addEventListener('click', async () => {
     const newBaseName = document.getElementById('renameFileName').value.trim();
     
     if (!newBaseName || !/^[a-zA-Z0-9_-]+$/.test(newBaseName)) {
@@ -874,6 +1024,10 @@ document.getElementById('newFileName')?.addEventListener('keydown', (e) => {
 
 document.getElementById('renameFileName')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('confirmRenameFileBtn').click();
+});
+
+document.getElementById('newTokenInput')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('saveNewTokenBtn').click();
 });
 
 // =============================================
@@ -938,4 +1092,4 @@ window.addEventListener('beforeunload', () => {
 
 document.addEventListener('DOMContentLoaded', init);
 
-console.log('📝 Game Editor loaded - Personal Access Token version');
+console.log('📝 Game Editor loaded - Settings & Theme Support');

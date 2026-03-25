@@ -1,25 +1,12 @@
 // =============================================
 // GITHUB OAUTH CONFIGURATION
 // =============================================
-// 
-// HOW TO GET YOUR CLIENT ID:
-// 1. Go to https://github.com/settings/developers
-// 2. Click "OAuth Apps" → "New OAuth App"
-// 3. Fill in:
-//    - Application name: WebGL Game Editor
-//    - Homepage URL: https://YOUR-USERNAME.github.io/game-editor
-//    - Callback URL: https://YOUR-USERNAME.github.io/game-editor
-// 4. Click "Register application"
-// 5. Copy your Client ID below
-//
-// Note: We use client-side OAuth flow (no client secret needed)
-// =============================================
 
 const GITHUB_CONFIG = {
-    // ⬇️ PASTE YOUR GITHUB OAUTH CLIENT ID HERE
+    // ⬇️ PASTE YOUR CLIENT ID HERE (from GitHub OAuth app)
     clientId: '6945536682bf825ff95bc6c7a5c9ab3da9a9049e',
     
-    // ⬇️ UPDATE THIS TO YOUR GITHUB PAGES URL
+    // ⬇️ Your GitHub Pages URL
     redirectUri: 'https://charliedayfockens-hue.github.io/gamemakerWEB/',
     
     // OAuth scopes we need
@@ -35,7 +22,7 @@ const GITHUB_API = {
 // Check if configured
 const isGitHubConfigured = 
     GITHUB_CONFIG.clientId && 
-    !GITHUB_CONFIG.clientId.includes('YOUR_GITHUB') &&
+    !GITHUB_CONFIG.clientId.includes('YOUR_CLIENT_ID') &&
     GITHUB_CONFIG.redirectUri && 
     !GITHUB_CONFIG.redirectUri.includes('YOUR-USERNAME');
 

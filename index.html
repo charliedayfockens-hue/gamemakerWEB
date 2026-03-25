@@ -1,58 +1,575 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebGL Game Editor</title>
+    <title>WebGL Game Editor - GitHub Sync</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <!-- Project Sidebar -->
-        <div class="sidebar">
-            <div class="sidebar-header">
-                <h2>Projects</h2>
-                <button id="newProjectBtn" class="btn-primary">+ New Project</button>
-            </div>
-            <div id="projectList" class="project-list"></div>
-        </div>
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loader"></div>
+        <p>Loading Editor...</p>
+    </div>
 
-        <!-- Editor Area -->
-        <div class="editor-container">
-            <div class="editor-header">
-                <h1 id="projectTitle">Select or Create a Project</h1>
-                <div class="header-actions">
-                    <button id="runBtn" class="btn-run" disabled>▶ Run</button>
-                    <button id="deleteProjectBtn" class="btn-delete" disabled>🗑 Delete</button>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen hidden">
+        <div class="login-container">
+            <div class="login-header">
+                <i class="fab fa-github"></i>
+                <h1>WebGL Game Editor</h1>
+                <p>Connect with GitHub to sync your projects</p>
+            </div>
+            
+            <div class="features">
+                <div class="feature">
+                    <i class="fas fa-cloud"></i>
+                    <span>Cloud Sync</span>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-code-branch"></i>
+                    <span>Version History</span>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-share-alt"></i>
+                    <span>Easy Sharing</span>
                 </div>
             </div>
-
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="html">HTML</button>
-                <button class="tab-btn" data-tab="css">CSS</button>
-                <button class="tab-btn" data-tab="js">JavaScript</button>
+            
+            <div class="token-form">
+                <input type="password" id="tokenInput" placeholder="Paste your GitHub token here (ghp_xxxx...)" autocomplete="off">
+                <button id="toggleTokenVisibility" class="btn-toggle-visibility" type="button" title="Show/hide token">
+                    <i class="fas fa-eye"></i>
+                </button>
             </div>
+            
+            <button id="connectBtn" class="github-btn">
+                <i class="fab fa-github"></i> Connect to GitHub
+            </button>
+            
+            <p id="loginError" class="login-error"></p>
+            
+            <button id="showSetupGuideBtn" class="setup-guide-btn">
+                <i class="fas fa-question-circle"></i> How do I get a token? (Setup Guide)
+            </button>
+            
+            <p class="login-note">
+                Your token is stored locally and never sent to any server except GitHub.
+            </p>
+        </div>
+    </div>
 
-            <div class="editor-panels">
-                <textarea id="htmlEditor" class="editor active" placeholder="Write your HTML here..."></textarea>
-                <textarea id="cssEditor" class="editor" placeholder="Write your CSS here..."></textarea>
-                <textarea id="jsEditor" class="editor" placeholder="Write your JavaScript here..."></textarea>
+    <!-- Setup Guide Modal -->
+    <div id="setupGuideModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2><i class="fas fa-book"></i> Setup Guide - Getting Your GitHub Token</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body setup-guide">
+                <div class="guide-intro">
+                    <p>A GitHub Personal Access Token is like a password that lets this app save your projects to your GitHub account. Follow these steps to create one:</p>
+                </div>
+                
+                <div class="guide-steps">
+                    <div class="guide-step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Go to GitHub Token Settings</h3>
+                            <p>Click the button below to open GitHub's token creation page. You'll need to be logged into GitHub.</p>
+                            <a href="https://github.com/settings/tokens/new" target="_blank" class="btn-primary">
+                                <i class="fab fa-github"></i> Open GitHub Token Page
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="guide-step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Fill in the Token Details</h3>
+                            <div class="step-details">
+                                <div class="detail-item">
+                                    <strong>Note:</strong>
+                                    <span>Enter <code>Game Editor</code> (or any name you'll remember)</span>
+                                </div>
+                                <div class="detail-item">
+                                    <strong>Expiration:</strong>
+                                    <span>Select <code>No expiration</code> (recommended) or <code>90 days</code></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="guide-step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Select Scopes (Permissions)</h3>
+                            <p>Scroll down to "Select scopes" and check <strong>ONLY</strong> this one:</p>
+                            <div class="scope-checkbox">
+                                <i class="fas fa-check-square"></i>
+                                <span><strong>gist</strong> - Create gists</span>
+                            </div>
+                            <p class="warning-text">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                Leave all other checkboxes unchecked for security!
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="guide-step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <h3>Generate Token</h3>
+                            <p>Scroll to the bottom and click the green <strong>"Generate token"</strong> button.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="guide-step">
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <h3>Copy Your Token</h3>
+                            <p>GitHub will show you your new token (starts with <code>ghp_</code>). Click the copy button next to it.</p>
+                            <p class="warning-text">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                Important: You won't be able to see this token again! Copy it now.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="guide-step">
+                        <div class="step-number">6</div>
+                        <div class="step-content">
+                            <h3>Paste in Game Editor</h3>
+                            <p>Come back here and paste your token in the input field, then click "Connect to GitHub".</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="guide-faq">
+                    <h3><i class="fas fa-question-circle"></i> Frequently Asked Questions</h3>
+                    
+                    <div class="faq-item">
+                        <h4>Is my token safe?</h4>
+                        <p>Yes! Your token is stored only in your browser's local storage. It's never sent anywhere except directly to GitHub's official API.</p>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <h4>What if my token expires?</h4>
+                        <p>Your projects are stored on GitHub, not in the token. Just create a new token and all your projects will be there!</p>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <h4>What does the "gist" permission do?</h4>
+                        <p>It allows the app to create, edit, and delete Gists (code snippets) on your GitHub account. Your projects are stored as Gists.</p>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <h4>Can I revoke the token later?</h4>
+                        <p>Yes! Go to <a href="https://github.com/settings/tokens" target="_blank">GitHub Token Settings</a> and click "Delete" next to your token.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary modal-cancel">Close</button>
+                <a href="https://github.com/settings/tokens/new" target="_blank" class="btn-primary">
+                    <i class="fab fa-github"></i> Create Token Now
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="mainApp" class="main-app hidden">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <i class="fas fa-gamepad"></i>
+                <h1>Game Editor</h1>
+                <span class="header-badge">
+                    <i class="fab fa-github"></i> GitHub Sync
+                </span>
+            </div>
+            <div class="header-right">
+                <button id="syncBtn" class="btn-icon" title="Sync with GitHub">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button id="settingsBtn" class="btn-icon" title="Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <div class="user-info">
+                    <img id="userAvatar" src="" alt="User">
+                    <span id="userName"></span>
+                </div>
+                <button id="signOutBtn" class="btn-icon" title="Sign Out">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="app-container">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-tabs">
+                    <button class="sidebar-tab active" data-view="projects">
+                        <i class="fas fa-folder"></i> Projects
+                    </button>
+                    <button class="sidebar-tab" data-view="archived">
+                        <i class="fas fa-archive"></i> Archived
+                    </button>
+                </div>
+
+                <div class="sidebar-content">
+                    <div id="projectsView" class="sidebar-view active">
+                        <button id="newProjectBtn" class="btn-new-project">
+                            <i class="fas fa-plus"></i> New Project
+                        </button>
+                        <div id="projectList" class="project-list"></div>
+                    </div>
+                    <div id="archivedView" class="sidebar-view">
+                        <div id="archivedList" class="project-list"></div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Editor Area -->
+            <main class="editor-area">
+                <div id="noProjectSelected" class="no-project">
+                    <i class="fas fa-folder-open"></i>
+                    <h2>No Project Selected</h2>
+                    <p>Create a new project or select an existing one</p>
+                </div>
+
+                <div id="projectEditor" class="project-editor hidden">
+                    <!-- Project Header -->
+                    <div class="project-header">
+                        <div class="project-info">
+                            <h2 id="projectName" contenteditable="false"></h2>
+                            <button id="editProjectNameBtn" class="btn-icon-small" title="Rename Project">
+                                <i class="fas fa-pencil-alt"></i>
+                            </button>
+                            <a id="viewOnGitHub" class="btn-icon-small" title="View on GitHub" target="_blank" style="display: none;">
+                                <i class="fab fa-github"></i>
+                            </a>
+                        </div>
+                        <div class="project-actions">
+                            <button id="addFileBtn" class="btn-action">
+                                <i class="fas fa-plus"></i> <span>Add File</span>
+                            </button>
+                            <button id="shareProjectBtn" class="btn-action">
+                                <i class="fas fa-share-alt"></i> <span>Share</span>
+                            </button>
+                            <button id="downloadProjectBtn" class="btn-action">
+                                <i class="fas fa-download"></i> <span>Download</span>
+                            </button>
+                            <button id="archiveProjectBtn" class="btn-action">
+                                <i class="fas fa-archive"></i> <span>Archive</span>
+                            </button>
+                            <button id="deleteProjectBtn" class="btn-action btn-danger">
+                                <i class="fas fa-trash"></i> <span>Delete</span>
+                            </button>
+                            <button id="runProjectBtn" class="btn-run">
+                                <i class="fas fa-play"></i> <span>Run</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- File Tabs -->
+                    <div class="file-tabs-container">
+                        <div id="fileTabs" class="file-tabs"></div>
+                    </div>
+
+                    <!-- Code Editor -->
+                    <div class="code-editor-container">
+                        <div class="editor-status">
+                            <span id="editorStatus" class="status-saved">
+                                <i class="fas fa-check-circle"></i> Saved
+                            </span>
+                        </div>
+                        <textarea id="codeEditor" class="code-editor" placeholder="Select a file to edit..." spellcheck="false"></textarea>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-cog"></i> Settings</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Appearance Section -->
+                <div class="settings-section">
+                    <h3><i class="fas fa-palette"></i> Appearance</h3>
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <label>Theme</label>
+                            <p>Choose between light and dark mode</p>
+                        </div>
+                        <div class="theme-toggle">
+                            <button id="themeLightBtn" class="theme-btn" data-theme="light">
+                                <i class="fas fa-sun"></i>
+                                Light
+                            </button>
+                            <button id="themeDarkBtn" class="theme-btn active" data-theme="dark">
+                                <i class="fas fa-moon"></i>
+                                Dark
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Account Section -->
+                <div class="settings-section">
+                    <h3><i class="fas fa-user"></i> Account</h3>
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <label>Connected as</label>
+                            <p id="settingsUserName">Loading...</p>
+                        </div>
+                        <a id="settingsProfileLink" href="#" target="_blank" class="btn-secondary btn-small">
+                            <i class="fab fa-github"></i> View Profile
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Token Section -->
+                <div class="settings-section">
+                    <h3><i class="fas fa-key"></i> GitHub Token</h3>
+                    <div class="setting-item token-setting">
+                        <div class="setting-info">
+                            <label>Your Personal Access Token</label>
+                            <p>Used to access your GitHub Gists</p>
+                        </div>
+                    </div>
+                    <div class="token-display">
+                        <input type="password" id="settingsTokenDisplay" readonly>
+                        <button id="toggleSettingsTokenBtn" class="btn-icon-small" title="Show/Hide Token">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button id="copyTokenBtn" class="btn-icon-small" title="Copy Token">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <p class="token-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Keep your token secret! Don't share it with anyone.
+                    </p>
+                    <div class="token-actions">
+                        <a href="https://github.com/settings/tokens" target="_blank" class="btn-secondary btn-small">
+                            <i class="fas fa-external-link-alt"></i> Manage Tokens on GitHub
+                        </a>
+                        <button id="changeTokenBtn" class="btn-secondary btn-small">
+                            <i class="fas fa-sync"></i> Change Token
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- About Section -->
+                <div class="settings-section">
+                    <h3><i class="fas fa-info-circle"></i> About</h3>
+                    <div class="about-info">
+                        <p><strong>WebGL Game Editor</strong></p>
+                        <p>Version 1.0.0</p>
+                        <p>Create, edit, and run web games with GitHub sync.</p>
+                        <p class="about-links">
+                            <a href="https://github.com" target="_blank"><i class="fab fa-github"></i> GitHub</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary modal-cancel">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Token Modal -->
+    <div id="changeTokenModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-key"></i> Change GitHub Token</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="change-token-info">
+                    Enter your new GitHub Personal Access Token below. Your projects won't be affected.
+                </p>
+                <div class="form-group">
+                    <label for="newTokenInput">New Token</label>
+                    <input type="password" id="newTokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+                </div>
+                <p id="changeTokenError" class="login-error"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary modal-cancel">Cancel</button>
+                <button id="saveNewTokenBtn" class="btn-primary">
+                    <i class="fas fa-save"></i> Save New Token
+                </button>
             </div>
         </div>
     </div>
 
     <!-- New Project Modal -->
-    <div id="projectModal" class="modal">
+    <div id="newProjectModal" class="modal">
         <div class="modal-content">
-            <h2>Create New Project</h2>
-            <input type="text" id="projectNameInput" placeholder="Project Name" maxlength="50">
-            <div class="modal-actions">
-                <button id="createProjectBtn" class="btn-primary">Create</button>
-                <button id="cancelModalBtn" class="btn-secondary">Cancel</button>
+            <div class="modal-header">
+                <h2>Create New Project</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="newProjectName">Project Name</label>
+                    <input type="text" id="newProjectName" placeholder="My Awesome Game" maxlength="50">
+                </div>
+                <div class="form-group">
+                    <label for="newProjectDesc">Description (optional)</label>
+                    <input type="text" id="newProjectDesc" placeholder="A cool WebGL game" maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label>Starter Template</label>
+                    <div class="template-options">
+                        <label class="template-option">
+                            <input type="radio" name="template" value="blank" checked>
+                            <span class="template-card">
+                                <i class="fas fa-file"></i>
+                                <span>Blank</span>
+                            </span>
+                        </label>
+                        <label class="template-option">
+                            <input type="radio" name="template" value="webgl">
+                            <span class="template-card">
+                                <i class="fas fa-cube"></i>
+                                <span>WebGL</span>
+                            </span>
+                        </label>
+                        <label class="template-option">
+                            <input type="radio" name="template" value="canvas">
+                            <span class="template-card">
+                                <i class="fas fa-paint-brush"></i>
+                                <span>Canvas 2D</span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="makePublic">
+                        <span>Make this project public (anyone can view)</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary modal-cancel">Cancel</button>
+                <button id="createProjectBtn" class="btn-primary">
+                    <i class="fab fa-github"></i> Create on GitHub
+                </button>
             </div>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <!-- Share Modal -->
+    <div id="shareModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Share Project</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>GitHub Gist URL</label>
+                    <div class="input-copy">
+                        <input type="text" id="shareUrl" readonly>
+                        <button id="copyUrlBtn" class="btn-copy">
+                            <i class="fas fa-copy"></i> Copy
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <p class="help-text">
+                        <i class="fas fa-info-circle"></i>
+                        Share this link to let others view and clone your project
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary modal-cancel">Close</button>
+                <a id="openGistBtn" class="btn-primary" target="_blank">
+                    <i class="fab fa-github"></i> View on GitHub
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- New File Modal -->
+    <div id="newFileModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add New File</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="newFileName">File Name</label>
+                    <input type="text" id="newFileName" placeholder="script" maxlength="30">
+                </div>
+                <div class="form-group">
+                    <label for="newFileType">File Type</label>
+                    <select id="newFileType">
+                        <option value="js">JavaScript (.js)</option>
+                        <option value="css">CSS (.css)</option>
+                        <option value="html">HTML (.html)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary modal-cancel">Cancel</button>
+                <button id="createFileBtn" class="btn-primary">Add File</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename File Modal -->
+    <div id="renameFileModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Rename File</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="renameFileName">New File Name</label>
+                    <input type="text" id="renameFileName" placeholder="newname" maxlength="30">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary modal-cancel">Cancel</button>
+                <button id="confirmRenameFileBtn" class="btn-primary">Rename</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Context Menu -->
+    <div id="fileContextMenu" class="context-menu">
+        <button class="context-menu-item" data-action="rename">
+            <i class="fas fa-pencil-alt"></i> Rename
+        </button>
+        <button class="context-menu-item" data-action="delete">
+            <i class="fas fa-trash"></i> Delete
+        </button>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- JSZip for downloads -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <!-- App Script -->
+    <script src="app.js"></script>
 </body>
 </html>

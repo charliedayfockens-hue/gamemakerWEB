@@ -1,1095 +1,1115 @@
-// =============================================
-// WebGL Game Editor - GitHub Personal Access Token Version
-// With Settings, Light/Dark Theme, and Setup Guide
-// =============================================
-
-const gameChannel = new BroadcastChannel('webgl_game_editor_channel');
-let runningGameWindow = null;
-let currentUser = null;
-let currentProject = null;
-let currentFile = null;
-let projects = {};
-let saveTimeout = null;
-let accessToken = null;
-
-// =============================================
-// DOM ELEMENTS
-// =============================================
-
-const loadingScreen = document.getElementById('loadingScreen');
-const loginScreen = document.getElementById('loginScreen');
-const mainApp = document.getElementById('mainApp');
-const connectBtn = document.getElementById('connectBtn');
-const tokenInput = document.getElementById('tokenInput');
-const toggleTokenVisibility = document.getElementById('toggleTokenVisibility');
-const loginError = document.getElementById('loginError');
-const showSetupGuideBtn = document.getElementById('showSetupGuideBtn');
-const setupGuideModal = document.getElementById('setupGuideModal');
-const signOutBtn = document.getElementById('signOutBtn');
-const syncBtn = document.getElementById('syncBtn');
-const settingsBtn = document.getElementById('settingsBtn');
-const settingsModal = document.getElementById('settingsModal');
-const userAvatar = document.getElementById('userAvatar');
-const userName = document.getElementById('userName');
-const projectList = document.getElementById('projectList');
-const archivedList = document.getElementById('archivedList');
-const projectEditor = document.getElementById('projectEditor');
-const noProjectSelected = document.getElementById('noProjectSelected');
-const projectName = document.getElementById('projectName');
-const fileTabs = document.getElementById('fileTabs');
-const codeEditor = document.getElementById('codeEditor');
-const editorStatus = document.getElementById('editorStatus');
-const viewOnGitHub = document.getElementById('viewOnGitHub');
-
-// Buttons
-const newProjectBtn = document.getElementById('newProjectBtn');
-const addFileBtn = document.getElementById('addFileBtn');
-const shareProjectBtn = document.getElementById('shareProjectBtn');
-const downloadProjectBtn = document.getElementById('downloadProjectBtn');
-const archiveProjectBtn = document.getElementById('archiveProjectBtn');
-const deleteProjectBtn = document.getElementById('deleteProjectBtn');
-const runProjectBtn = document.getElementById('runProjectBtn');
-const editProjectNameBtn = document.getElementById('editProjectNameBtn');
-
-// Modals
-const newProjectModal = document.getElementById('newProjectModal');
-const shareModal = document.getElementById('shareModal');
-const newFileModal = document.getElementById('newFileModal');
-const renameFileModal = document.getElementById('renameFileModal');
-const changeTokenModal = document.getElementById('changeTokenModal');
-const fileContextMenu = document.getElementById('fileContextMenu');
-
-// =============================================
-// TEMPLATES
-// =============================================
-
-const templates = {
-    blank: {
-        files: {
-            'index.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>My Game</title>\n    <link rel="stylesheet" href="style.css">\n</head>\n<body>\n    <h1>Hello World!</h1>\n    <script src="script.js"></script>\n</body>\n</html>',
-            'style.css': '/* Your styles here */\nbody {\n    margin: 0;\n    padding: 20px;\n    font-family: Arial, sans-serif;\n    background: #1a1a2e;\n    color: white;\n}',
-            'script.js': '// Your JavaScript code here\nconsole.log("Hello from JavaScript!");'
-        }
-    },
-    webgl: {
-        files: {
-            'index.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>WebGL Game</title>\n    <link rel="stylesheet" href="style.css">\n</head>\n<body>\n    <canvas id="glCanvas"></canvas>\n    <script src="main.js"></script>\n</body>\n</html>',
-            'style.css': '* {\n    margin: 0;\n    padding: 0;\n    box-sizing: border-box;\n}\n\nbody {\n    overflow: hidden;\n    background: #000;\n}\n\n#glCanvas {\n    display: block;\n    width: 100vw;\n    height: 100vh;\n}',
-            'main.js': '// WebGL Setup\nconst canvas = document.getElementById("glCanvas");\nconst gl = canvas.getContext("webgl");\n\nif (!gl) {\n    alert("WebGL not supported!");\n}\n\ncanvas.width = window.innerWidth;\ncanvas.height = window.innerHeight;\ngl.viewport(0, 0, canvas.width, canvas.height);\n\ngl.clearColor(0.1, 0.2, 0.3, 1.0);\ngl.clear(gl.COLOR_BUFFER_BIT);\n\nconsole.log("WebGL ready!");'
-        }
-    },
-    canvas: {
-        files: {
-            'index.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>Canvas Game</title>\n    <link rel="stylesheet" href="style.css">\n</head>\n<body>\n    <canvas id="gameCanvas"></canvas>\n    <script src="game.js"></script>\n</body>\n</html>',
-            'style.css': '* {\n    margin: 0;\n    padding: 0;\n}\n\nbody {\n    overflow: hidden;\n    background: #1a1a2e;\n}\n\n#gameCanvas {\n    display: block;\n}',
-            'game.js': 'const canvas = document.getElementById("gameCanvas");\nconst ctx = canvas.getContext("2d");\n\ncanvas.width = window.innerWidth;\ncanvas.height = window.innerHeight;\n\nconst player = {\n    x: canvas.width / 2,\n    y: canvas.height / 2,\n    size: 30,\n    speed: 5,\n    color: "#00ff88"\n};\n\nconst keys = {};\ndocument.addEventListener("keydown", e => keys[e.key] = true);\ndocument.addEventListener("keyup", e => keys[e.key] = false);\n\nfunction update() {\n    if (keys["ArrowUp"] || keys["w"]) player.y -= player.speed;\n    if (keys["ArrowDown"] || keys["s"]) player.y += player.speed;\n    if (keys["ArrowLeft"] || keys["a"]) player.x -= player.speed;\n    if (keys["ArrowRight"] || keys["d"]) player.x += player.speed;\n}\n\nfunction draw() {\n    ctx.fillStyle = "#1a1a2e";\n    ctx.fillRect(0, 0, canvas.width, canvas.height);\n    \n    ctx.beginPath();\n    ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);\n    ctx.fillStyle = player.color;\n    ctx.fill();\n    \n    ctx.fillStyle = "#fff";\n    ctx.font = "18px Arial";\n    ctx.fillText("Use WASD or Arrow Keys", 20, 30);\n}\n\nfunction gameLoop() {\n    update();\n    draw();\n    requestAnimationFrame(gameLoop);\n}\n\ngameLoop();'
-        }
-    }
-};
-
-// =============================================
-// THEME MANAGEMENT
-// =============================================
-
-function initTheme() {
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    setTheme(savedTheme);
-}
-
-function setTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-    
-    // Update theme buttons
-    document.querySelectorAll('.theme-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.theme === theme);
-    });
-}
-
-document.getElementById('themeLightBtn')?.addEventListener('click', () => setTheme('light'));
-document.getElementById('themeDarkBtn')?.addEventListener('click', () => setTheme('dark'));
-
-// =============================================
-// INITIALIZATION
-// =============================================
-
-async function init() {
-    console.log('🚀 Initializing Game Editor...');
-    
-    // Initialize theme
-    initTheme();
-    
-    // Check for stored token
-    accessToken = localStorage.getItem('github_token');
-    
-    if (accessToken) {
-        console.log('🔑 Found stored token, validating...');
-        try {
-            await loadUserData();
-        } catch (error) {
-            console.error('Token invalid:', error);
-            localStorage.removeItem('github_token');
-            accessToken = null;
-            showLoginScreen();
-        }
-    } else {
-        console.log('ℹ️ No token found, showing login');
-        showLoginScreen();
-    }
-}
-
-function showLoginScreen() {
-    loadingScreen.classList.add('hidden');
-    loginScreen.classList.remove('hidden');
-    mainApp.classList.add('hidden');
-    loginError.textContent = '';
-}
-
-function showMainApp() {
-    loadingScreen.classList.add('hidden');
-    loginScreen.classList.add('hidden');
-    mainApp.classList.remove('hidden');
-}
-
-// Timeout fallback
-setTimeout(() => {
-    if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
-        showLoginScreen();
-    }
-}, 5000);
-
-// =============================================
-// SETUP GUIDE
-// =============================================
-
-showSetupGuideBtn?.addEventListener('click', () => {
-    setupGuideModal.classList.add('active');
-});
-
-// =============================================
-// TOKEN VISIBILITY TOGGLE (Login)
-// =============================================
-
-toggleTokenVisibility?.addEventListener('click', () => {
-    const isPassword = tokenInput.type === 'password';
-    tokenInput.type = isPassword ? 'text' : 'password';
-    toggleTokenVisibility.innerHTML = `<i class="fas fa-eye${isPassword ? '-slash' : ''}"></i>`;
-});
-
-// =============================================
-// AUTHENTICATION
-// =============================================
-
-connectBtn?.addEventListener('click', async () => {
-    const token = tokenInput.value.trim();
-    
-    if (!token) {
-        loginError.textContent = 'Please enter your GitHub token';
-        return;
-    }
-    
-    if (!token.startsWith('ghp_') && !token.startsWith('github_pat_')) {
-        loginError.textContent = 'Invalid token format. Token should start with ghp_ or github_pat_';
-        return;
-    }
-    
-    connectBtn.disabled = true;
-    connectBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connecting...';
-    loginError.textContent = '';
-    
-    try {
-        accessToken = token;
-        await loadUserData();
+// WebGL Game Editor - Main Application
+class GameEditor {
+    constructor() {
+        this.projects = [];
+        this.currentProject = null;
+        this.currentFile = null;
+        this.openTabs = [];
+        this.contextTarget = null;
+        this.contextType = null;
         
-        // Save token
-        localStorage.setItem('github_token', token);
-        tokenInput.value = '';
+        this.init();
+    }
+    
+    init() {
+        this.loadFromStorage();
+        this.bindEvents();
+        this.renderProjects();
+        this.updateLineNumbers();
+    }
+    
+    // Storage Methods
+    loadFromStorage() {
+        const saved = localStorage.getItem('gameEditorProjects');
+        if (saved) {
+            this.projects = JSON.parse(saved);
+        }
+    }
+    
+    saveToStorage() {
+        localStorage.setItem('gameEditorProjects', JSON.stringify(this.projects));
+        this.showToast('Project saved', 'success');
+    }
+    
+    // Event Binding
+    bindEvents() {
+        // Header Buttons
+        document.getElementById('newProjectBtn').addEventListener('click', () => this.showModal('newProjectModal'));
+        document.getElementById('runProjectBtn').addEventListener('click', () => this.runProject());
         
-    } catch (error) {
-        console.error('Login error:', error);
-        loginError.textContent = 'Invalid token. Please check and try again.';
-        accessToken = null;
+        // New Project Modal
+        document.getElementById('createProjectBtn').addEventListener('click', () => this.createProject());
+        document.getElementById('cancelProjectBtn').addEventListener('click', () => this.hideModal('newProjectModal'));
+        document.getElementById('projectTypeSelect').addEventListener('change', (e) => this.updateProjectTypeInfo(e.target.value));
         
-        connectBtn.disabled = false;
-        connectBtn.innerHTML = '<i class="fab fa-github"></i> Connect to GitHub';
-    }
-});
-
-tokenInput?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-        connectBtn.click();
-    }
-});
-
-async function loadUserData() {
-    const response = await githubRequest('/user');
-    currentUser = response;
-    
-    userAvatar.src = currentUser.avatar_url;
-    userName.textContent = currentUser.login;
-    
-    showMainApp();
-    await loadProjects();
-    
-    console.log('✅ Logged in as:', currentUser.login);
-}
-
-signOutBtn?.addEventListener('click', () => {
-    if (confirm('Sign out?')) {
-        localStorage.removeItem('github_token');
-        accessToken = null;
-        currentUser = null;
-        projects = {};
-        currentProject = null;
-        currentFile = null;
-        showLoginScreen();
-        showToast('Signed out', 'info');
-    }
-});
-
-// =============================================
-// SETTINGS MODAL
-// =============================================
-
-settingsBtn?.addEventListener('click', () => {
-    // Update settings modal content
-    document.getElementById('settingsUserName').textContent = currentUser?.login || 'Unknown';
-    document.getElementById('settingsProfileLink').href = `https://github.com/${currentUser?.login}`;
-    document.getElementById('settingsTokenDisplay').value = accessToken || '';
-    
-    // Update theme buttons
-    const currentTheme = localStorage.getItem('theme') || 'dark';
-    document.querySelectorAll('.theme-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.theme === currentTheme);
-    });
-    
-    settingsModal.classList.add('active');
-});
-
-// Token visibility toggle (Settings)
-document.getElementById('toggleSettingsTokenBtn')?.addEventListener('click', () => {
-    const input = document.getElementById('settingsTokenDisplay');
-    const isPassword = input.type === 'password';
-    input.type = isPassword ? 'text' : 'password';
-    document.getElementById('toggleSettingsTokenBtn').innerHTML = 
-        `<i class="fas fa-eye${isPassword ? '-slash' : ''}"></i>`;
-});
-
-// Copy token
-document.getElementById('copyTokenBtn')?.addEventListener('click', () => {
-    const input = document.getElementById('settingsTokenDisplay');
-    input.type = 'text';
-    input.select();
-    document.execCommand('copy');
-    input.type = 'password';
-    showToast('Token copied to clipboard!', 'success');
-});
-
-// Change token button
-document.getElementById('changeTokenBtn')?.addEventListener('click', () => {
-    document.getElementById('newTokenInput').value = '';
-    document.getElementById('changeTokenError').textContent = '';
-    changeTokenModal.classList.add('active');
-});
-
-// Save new token
-document.getElementById('saveNewTokenBtn')?.addEventListener('click', async () => {
-    const newToken = document.getElementById('newTokenInput').value.trim();
-    const errorEl = document.getElementById('changeTokenError');
-    
-    if (!newToken) {
-        errorEl.textContent = 'Please enter a token';
-        return;
-    }
-    
-    if (!newToken.startsWith('ghp_') && !newToken.startsWith('github_pat_')) {
-        errorEl.textContent = 'Invalid token format';
-        return;
-    }
-    
-    const btn = document.getElementById('saveNewTokenBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
-    
-    try {
-        // Test the new token
-        const response = await fetch('https://api.github.com/user', {
-            headers: {
-                'Authorization': `token ${newToken}`,
-                'Accept': 'application/vnd.github.v3+json'
+        // Rename Modal
+        document.getElementById('confirmRenameBtn').addEventListener('click', () => this.confirmRename());
+        document.getElementById('cancelRenameBtn').addEventListener('click', () => this.hideModal('renameModal'));
+        
+        // Add File Modal
+        document.getElementById('addFileBtn').addEventListener('click', () => this.showModal('addFileModal'));
+        document.getElementById('confirmAddFileBtn').addEventListener('click', () => this.addFile());
+        document.getElementById('cancelAddFileBtn').addEventListener('click', () => this.hideModal('addFileModal'));
+        
+        // Template Buttons
+        document.querySelectorAll('.template-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const ext = e.target.dataset.ext;
+                document.getElementById('newFileNameInput').value = 'newfile' + ext;
+            });
+        });
+        
+        // Modal Close Buttons
+        document.querySelectorAll('.modal-close').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.hideModal(e.target.dataset.modal);
+            });
+        });
+        
+        // Modal Overlays
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                const modal = e.target.closest('.modal');
+                if (modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+        
+        // Code Editor
+        const editor = document.getElementById('codeEditor');
+        editor.addEventListener('input', () => this.onEditorChange());
+        editor.addEventListener('keydown', (e) => this.handleEditorKeydown(e));
+        editor.addEventListener('scroll', () => this.syncLineNumbers());
+        editor.addEventListener('click', () => this.updateCursorPosition());
+        editor.addEventListener('keyup', () => this.updateCursorPosition());
+        
+        // Context Menu
+        document.addEventListener('click', () => this.hideContextMenu());
+        document.querySelectorAll('.context-menu-item').forEach(item => {
+            item.addEventListener('click', (e) => this.handleContextAction(e.currentTarget.dataset.action));
+        });
+        
+        // Keyboard Shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                this.saveToStorage();
             }
         });
         
-        if (!response.ok) {
-            throw new Error('Invalid token');
-        }
-        
-        // Token is valid, save it
-        accessToken = newToken;
-        localStorage.setItem('github_token', newToken);
-        
-        // Update user data
-        const userData = await response.json();
-        currentUser = userData;
-        userAvatar.src = currentUser.avatar_url;
-        userName.textContent = currentUser.login;
-        
-        closeAllModals();
-        showToast('Token updated successfully!', 'success');
-        
-    } catch (error) {
-        errorEl.textContent = 'Invalid token. Please check and try again.';
+        // Enter key in modals
+        document.getElementById('projectNameInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') this.createProject();
+        });
+        document.getElementById('renameInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') this.confirmRename();
+        });
+        document.getElementById('newFileNameInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') this.addFile();
+        });
     }
     
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-save"></i> Save New Token';
-});
-
-// =============================================
-// GITHUB API
-// =============================================
-
-async function githubRequest(endpoint, options = {}) {
-    const url = endpoint.startsWith('http') ? endpoint : `https://api.github.com${endpoint}`;
-    
-    const response = await fetch(url, {
-        ...options,
-        headers: {
-            'Authorization': `token ${accessToken}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'Content-Type': 'application/json',
-            ...options.headers
-        }
-    });
-    
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.message || `GitHub API error: ${response.status}`);
-    }
-    
-    const text = await response.text();
-    return text ? JSON.parse(text) : null;
-}
-
-// =============================================
-// PROJECT MANAGEMENT
-// =============================================
-
-async function loadProjects() {
-    try {
-        setEditorStatus('syncing', 'Syncing...');
-        
-        const gists = await githubRequest('/gists');
-        projects = {};
-        
-        for (const gist of gists) {
-            if (gist.description && gist.description.startsWith('[GameEditor]')) {
-                const projectData = parseGistToProject(gist);
-                projects[gist.id] = projectData;
-            }
-        }
-        
-        renderProjectList();
-        renderArchivedList();
-        setEditorStatus('saved', 'Synced');
-        
-        console.log(`✅ Loaded ${Object.keys(projects).length} projects`);
-    } catch (error) {
-        console.error('Load projects error:', error);
-        setEditorStatus('error', 'Sync failed');
-        showToast('Failed to load projects', 'error');
-    }
-}
-
-function parseGistToProject(gist) {
-    const files = {};
-    
-    for (const [filename, fileData] of Object.entries(gist.files)) {
-        if (filename !== 'project-meta.json') {
-            files[filename] = fileData.content || '';
+    // Modal Methods
+    showModal(modalId) {
+        document.getElementById(modalId).classList.add('active');
+        const input = document.querySelector(`#${modalId} input`);
+        if (input) {
+            input.focus();
+            input.value = '';
         }
     }
     
-    let meta = { archived: false };
-    if (gist.files['project-meta.json']) {
-        try {
-            meta = JSON.parse(gist.files['project-meta.json'].content);
-        } catch (e) {}
+    hideModal(modalId) {
+        document.getElementById(modalId).classList.remove('active');
     }
     
-    return {
-        id: gist.id,
-        name: gist.description.replace('[GameEditor] ', ''),
-        description: meta.description || '',
-        files: files,
-        archived: meta.archived || false,
-        gistUrl: gist.html_url,
-        isPublic: gist.public,
-        updatedAt: gist.updated_at
-    };
-}
-
-async function saveProjectToGithub(project, isNew = false) {
-    try {
-        setEditorStatus('saving', 'Saving...');
+    // Project Methods
+    createProject() {
+        const nameInput = document.getElementById('projectNameInput');
+        const typeSelect = document.getElementById('projectTypeSelect');
         
-        const gistFiles = {};
+        const name = nameInput.value.trim();
+        const type = typeSelect.value;
         
-        for (const [filename, content] of Object.entries(project.files)) {
-            gistFiles[filename] = { content: content || ' ' };
+        if (!name) {
+            this.showToast('Please enter a project name', 'error');
+            return;
         }
         
-        gistFiles['project-meta.json'] = {
-            content: JSON.stringify({
-                description: project.description || '',
-                archived: project.archived || false,
-                version: '1.0'
-            }, null, 2)
+        const project = {
+            id: Date.now().toString(),
+            name: name,
+            type: type,
+            files: this.getDefaultFiles(type),
+            createdAt: new Date().toISOString()
         };
         
-        if (isNew) {
-            const response = await githubRequest('/gists', {
-                method: 'POST',
-                body: JSON.stringify({
-                    description: `[GameEditor] ${project.name}`,
-                    public: project.isPublic || false,
-                    files: gistFiles
-                })
-            });
-            
-            project.id = response.id;
-            project.gistUrl = response.html_url;
-            projects[project.id] = project;
+        this.projects.push(project);
+        this.saveToStorage();
+        this.hideModal('newProjectModal');
+        this.renderProjects();
+        this.selectProject(project.id);
+        this.showToast(`Project "${name}" created!`, 'success');
+    }
+    
+    getDefaultFiles(type) {
+        const files = [
+            { name: 'index.html', content: this.getHTMLTemplate(type) },
+            { name: 'styles.css', content: this.getCSSTemplate(type) },
+            { name: 'main.js', content: this.getJSTemplate(type) }
+        ];
+        return files;
+    }
+    
+    getHTMLTemplate(type) {
+        const titles = { '2d': '2D Game', 'app': 'Web App', '3d': 'WebGL 3D Game' };
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${titles[type]}</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    ${type === '2d' ? '<canvas id="gameCanvas"></canvas>' : ''}
+    ${type === '3d' ? '<canvas id="glCanvas"></canvas>' : ''}
+    ${type === 'app' ? '<div id="app">\n        <h1>Welcome to My App</h1>\n    </div>' : ''}
+    <script src="main.js"><\/script>
+</body>
+</html>`;
+    }
+    
+    getCSSTemplate(type) {
+        let css = `* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: #1a1a2e;
+    color: white;
+    min-height: 100vh;
+`;
+        
+        if (type === '2d' || type === '3d') {
+            css += `    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+canvas {
+    border: 2px solid #4a4a6a;
+    border-radius: 8px;
+}`;
         } else {
-            await githubRequest(`/gists/${project.id}`, {
-                method: 'PATCH',
-                body: JSON.stringify({
-                    description: `[GameEditor] ${project.name}`,
-                    files: gistFiles
-                })
-            });
+            css += `}
+
+#app {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+    margin-top: 50px;
+}`;
         }
         
-        setEditorStatus('saved', 'Saved');
-        return project;
-    } catch (error) {
-        console.error('Save error:', error);
-        setEditorStatus('error', 'Save failed');
-        showToast('Failed to save', 'error');
-        throw error;
-    }
-}
-
-async function deleteProjectFromGithub(projectId) {
-    try {
-        await githubRequest(`/gists/${projectId}`, { method: 'DELETE' });
-        delete projects[projectId];
-        showToast('Project deleted', 'success');
-    } catch (error) {
-        console.error('Delete error:', error);
-        showToast('Failed to delete', 'error');
-    }
-}
-
-// Sync button
-syncBtn?.addEventListener('click', async () => {
-    syncBtn.classList.add('syncing');
-    await loadProjects();
-    syncBtn.classList.remove('syncing');
-});
-
-// =============================================
-// UI RENDERING
-// =============================================
-
-function renderProjectList() {
-    const active = Object.values(projects).filter(p => !p.archived);
-    projectList.innerHTML = active.length === 0 ? '<p class="no-items">No projects yet</p>' : '';
-    
-    active.forEach(project => {
-        const item = document.createElement('div');
-        item.className = `project-item ${currentProject?.id === project.id ? 'active' : ''}`;
-        item.innerHTML = `
-            <i class="fas fa-folder"></i>
-            <span class="project-item-name">${escapeHtml(project.name)}</span>
-        `;
-        item.addEventListener('click', () => selectProject(project.id));
-        projectList.appendChild(item);
-    });
-}
-
-function renderArchivedList() {
-    const archived = Object.values(projects).filter(p => p.archived);
-    archivedList.innerHTML = archived.length === 0 ? '<p class="no-items">No archived projects</p>' : '';
-    
-    archived.forEach(project => {
-        const item = document.createElement('div');
-        item.className = `project-item ${currentProject?.id === project.id ? 'active' : ''}`;
-        item.innerHTML = `
-            <i class="fas fa-archive"></i>
-            <span class="project-item-name">${escapeHtml(project.name)}</span>
-            <div class="project-item-actions">
-                <button title="Restore" onclick="event.stopPropagation(); restoreProject('${project.id}')">
-                    <i class="fas fa-undo"></i>
-                </button>
-            </div>
-        `;
-        item.addEventListener('click', () => selectProject(project.id));
-        archivedList.appendChild(item);
-    });
-}
-
-function selectProject(projectId) {
-    saveCurrentFile();
-    
-    currentProject = projects[projectId];
-    currentFile = null;
-    
-    if (currentProject) {
-        noProjectSelected.classList.add('hidden');
-        projectEditor.classList.remove('hidden');
-        projectName.textContent = currentProject.name;
-        
-        if (viewOnGitHub) {
-            viewOnGitHub.href = currentProject.gistUrl;
-            viewOnGitHub.style.display = 'flex';
-        }
-        
-        renderFileTabs();
-        
-        const fileNames = Object.keys(currentProject.files);
-        if (fileNames.length > 0) {
-            selectFile(fileNames[0]);
-        } else {
-            codeEditor.value = '';
-            codeEditor.disabled = true;
-        }
+        return css;
     }
     
-    renderProjectList();
-    renderArchivedList();
-}
+    getJSTemplate(type) {
+        if (type === '2d') {
+            return `// 2D Game Setup
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 
-function showNoProjectSelected() {
-    noProjectSelected.classList.remove('hidden');
-    projectEditor.classList.add('hidden');
-    if (viewOnGitHub) viewOnGitHub.style.display = 'none';
-}
+canvas.width = 800;
+canvas.height = 600;
 
-window.restoreProject = async function(projectId) {
-    const project = projects[projectId];
-    if (!project) return;
-    
-    project.archived = false;
-    await saveProjectToGithub(project);
-    renderProjectList();
-    renderArchivedList();
-    showToast('Project restored', 'success');
+// Game variables
+let player = {
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    size: 30,
+    speed: 5,
+    color: '#6366f1'
 };
 
-// =============================================
-// FILE TABS
-// =============================================
+let keys = {};
 
-function renderFileTabs() {
-    fileTabs.innerHTML = '';
-    if (!currentProject?.files) return;
+// Input handling
+document.addEventListener('keydown', (e) => keys[e.key] = true);
+document.addEventListener('keyup', (e) => keys[e.key] = false);
+
+// Game loop
+function gameLoop() {
+    update();
+    render();
+    requestAnimationFrame(gameLoop);
+}
+
+function update() {
+    if (keys['ArrowUp'] || keys['w']) player.y -= player.speed;
+    if (keys['ArrowDown'] || keys['s']) player.y += player.speed;
+    if (keys['ArrowLeft'] || keys['a']) player.x -= player.speed;
+    if (keys['ArrowRight'] || keys['d']) player.x += player.speed;
     
-    Object.keys(currentProject.files).forEach(filename => {
-        const tab = document.createElement('div');
-        const ext = filename.split('.').pop();
-        tab.className = `file-tab ${currentFile === filename ? 'active' : ''}`;
-        tab.innerHTML = `
-            <i class="file-tab-icon ${ext} ${getFileIcon(ext)}"></i>
-            <span>${escapeHtml(filename)}</span>
-        `;
-        tab.addEventListener('click', () => selectFile(filename));
-        tab.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            showFileContextMenu(e, filename);
-        });
-        fileTabs.appendChild(tab);
-    });
+    // Keep player in bounds
+    player.x = Math.max(player.size, Math.min(canvas.width - player.size, player.x));
+    player.y = Math.max(player.size, Math.min(canvas.height - player.size, player.y));
 }
 
-function getFileIcon(ext) {
-    const icons = { html: 'fab fa-html5', css: 'fab fa-css3-alt', js: 'fab fa-js-square' };
-    return icons[ext] || 'fas fa-file';
-}
-
-function selectFile(filename) {
-    if (currentProject?.files?.[filename] === undefined) return;
+function render() {
+    // Clear canvas
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    saveCurrentFile();
-    currentFile = filename;
-    codeEditor.value = currentProject.files[filename] || '';
-    codeEditor.disabled = false;
-    renderFileTabs();
+    // Draw player
+    ctx.fillStyle = player.color;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Draw instructions
+    ctx.fillStyle = 'white';
+    ctx.font = '16px Arial';
+    ctx.fillText('Use WASD or Arrow keys to move', 20, 30);
 }
 
-function saveCurrentFile() {
-    if (currentProject && currentFile && currentProject.files.hasOwnProperty(currentFile)) {
-        currentProject.files[currentFile] = codeEditor.value;
+// Start game
+gameLoop();
+console.log('2D Game initialized!');`;
+        } else if (type === '3d') {
+            return `// WebGL 3D Game Setup
+const canvas = document.getElementById('glCanvas');
+const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+
+canvas.width = 800;
+canvas.height = 600;
+
+if (!gl) {
+    alert('WebGL not supported!');
+    throw new Error('WebGL not supported');
+}
+
+// Vertex shader
+const vsSource = \`
+    attribute vec4 aVertexPosition;
+    attribute vec4 aVertexColor;
+    uniform mat4 uModelViewMatrix;
+    uniform mat4 uProjectionMatrix;
+    varying lowp vec4 vColor;
+    void main() {
+        gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+        vColor = aVertexColor;
     }
+\`;
+
+// Fragment shader
+const fsSource = \`
+    varying lowp vec4 vColor;
+    void main() {
+        gl_FragColor = vColor;
+    }
+\`;
+
+// Shader compilation helper
+function loadShader(gl, type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+    }
+    return shader;
 }
 
-// =============================================
-// CODE EDITOR
-// =============================================
+// Initialize shaders
+const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
+const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
 
-codeEditor?.addEventListener('input', () => {
-    if (currentProject && currentFile) {
-        currentProject.files[currentFile] = codeEditor.value;
-        
-        clearTimeout(saveTimeout);
-        setEditorStatus('saving', 'Saving...');
-        saveTimeout = setTimeout(async () => {
-            try {
-                await saveProjectToGithub(currentProject);
-            } catch (error) {
-                console.error('Auto-save failed:', error);
-            }
-        }, 2000);
-    }
-});
+const shaderProgram = gl.createProgram();
+gl.attachShader(shaderProgram, vertexShader);
+gl.attachShader(shaderProgram, fragmentShader);
+gl.linkProgram(shaderProgram);
 
-codeEditor?.addEventListener('keydown', (e) => {
-    if (e.key === 'Tab') {
-        e.preventDefault();
-        const start = codeEditor.selectionStart;
-        const end = codeEditor.selectionEnd;
-        codeEditor.value = codeEditor.value.substring(0, start) + '    ' + codeEditor.value.substring(end);
-        codeEditor.selectionStart = codeEditor.selectionEnd = start + 4;
-    }
-});
-
-function setEditorStatus(type, message) {
-    if (!editorStatus) return;
-    
-    editorStatus.className = `status-${type}`;
-    const icons = {
-        saved: 'fas fa-check-circle',
-        saving: 'fas fa-spinner fa-pulse',
-        syncing: 'fas fa-sync-alt fa-spin',
-        error: 'fas fa-exclamation-circle'
-    };
-    editorStatus.innerHTML = `<i class="${icons[type] || 'fas fa-circle'}"></i> ${message}`;
+if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+    console.error('Shader program error:', gl.getProgramInfoLog(shaderProgram));
 }
 
-// =============================================
-// RUN PROJECT
-// =============================================
+// Get attribute/uniform locations
+const programInfo = {
+    program: shaderProgram,
+    attribLocations: {
+        vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+        vertexColor: gl.getAttribLocation(shaderProgram, 'aVertexColor'),
+    },
+    uniformLocations: {
+        projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
+        modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+    },
+};
 
-runProjectBtn?.addEventListener('click', () => {
-    if (!currentProject?.files) return;
+// Create cube buffers
+function initBuffers(gl) {
+    const positions = [
+        // Front face
+        -1, -1,  1,   1, -1,  1,   1,  1,  1,  -1,  1,  1,
+        // Back face
+        -1, -1, -1,  -1,  1, -1,   1,  1, -1,   1, -1, -1,
+        // Top face
+        -1,  1, -1,  -1,  1,  1,   1,  1,  1,   1,  1, -1,
+        // Bottom face
+        -1, -1, -1,   1, -1, -1,   1, -1,  1,  -1, -1,  1,
+        // Right face
+         1, -1, -1,   1,  1, -1,   1,  1,  1,   1, -1,  1,
+        // Left face
+        -1, -1, -1,  -1, -1,  1,  -1,  1,  1,  -1,  1, -1,
+    ];
     
-    saveCurrentFile();
+    const colors = [
+        [1, 0, 0, 1], [0, 1, 0, 1], [0, 0, 1, 1],
+        [1, 1, 0, 1], [1, 0, 1, 1], [0, 1, 1, 1],
+    ];
     
-    gameChannel.postMessage({ type: 'close_game' });
-    if (runningGameWindow && !runningGameWindow.closed) {
-        runningGameWindow.close();
-    }
-    
-    let html = currentProject.files['index.html'] || '<!DOCTYPE html><html><head></head><body></body></html>';
-    let css = '';
-    let js = '';
-    
-    Object.entries(currentProject.files).forEach(([filename, content]) => {
-        if (filename.endsWith('.css')) {
-            css += `/* ${filename} */\n${content}\n\n`;
-        } else if (filename.endsWith('.js')) {
-            js += `// ${filename}\n${content}\n\n`;
+    let generatedColors = [];
+    for (let j = 0; j < 6; j++) {
+        const c = colors[j];
+        for (let i = 0; i < 4; i++) {
+            generatedColors = generatedColors.concat(c);
         }
-    });
-    
-    html = html.replace(/<link[^>]*href=["'][^"']*\.css["'][^>]*>/gi, '');
-    html = html.replace(/<script[^>]*src=["'][^"']*\.js["'][^>]*><\/script>/gi, '');
-    
-    const finalHtml = html
-        .replace('</head>', `<style>${css}</style></head>`)
-        .replace('</body>', `<script>${js}<\/script></body>`);
-    
-    runningGameWindow = window.open('', '_blank', 'width=1024,height=768');
-    
-    if (runningGameWindow) {
-        runningGameWindow.document.open();
-        runningGameWindow.document.write(finalHtml);
-        runningGameWindow.document.close();
-        showToast('Game running!', 'success');
-    } else {
-        showToast('Allow popups to run games', 'error');
-    }
-});
-
-gameChannel.addEventListener('message', (e) => {
-    if (e.data.type === 'close_game' && runningGameWindow && !runningGameWindow.closed) {
-        runningGameWindow.close();
-        runningGameWindow = null;
-    }
-});
-
-// =============================================
-// SHARE PROJECT
-// =============================================
-
-shareProjectBtn?.addEventListener('click', () => {
-    if (!currentProject) return;
-    
-    document.getElementById('shareUrl').value = currentProject.gistUrl;
-    document.getElementById('openGistBtn').href = currentProject.gistUrl;
-    shareModal.classList.add('active');
-});
-
-document.getElementById('copyUrlBtn')?.addEventListener('click', () => {
-    const input = document.getElementById('shareUrl');
-    input.select();
-    document.execCommand('copy');
-    showToast('URL copied!', 'success');
-});
-
-// =============================================
-// DOWNLOAD PROJECT
-// =============================================
-
-downloadProjectBtn?.addEventListener('click', async () => {
-    if (!currentProject?.files) return;
-    
-    saveCurrentFile();
-    
-    const zip = new JSZip();
-    Object.entries(currentProject.files).forEach(([filename, content]) => {
-        zip.file(filename, content);
-    });
-    
-    const blob = await zip.generateAsync({ type: 'blob' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${currentProject.name}.zip`;
-    a.click();
-    URL.revokeObjectURL(url);
-    
-    showToast('Downloaded!', 'success');
-});
-
-// =============================================
-// ARCHIVE & DELETE
-// =============================================
-
-archiveProjectBtn?.addEventListener('click', async () => {
-    if (!currentProject) return;
-    
-    currentProject.archived = true;
-    await saveProjectToGithub(currentProject);
-    showNoProjectSelected();
-    currentProject = null;
-    currentFile = null;
-    renderProjectList();
-    renderArchivedList();
-    showToast('Project archived', 'success');
-});
-
-deleteProjectBtn?.addEventListener('click', async () => {
-    if (!currentProject) return;
-    
-    if (confirm(`Delete "${currentProject.name}" from GitHub? This cannot be undone.`)) {
-        const projectId = currentProject.id;
-        showNoProjectSelected();
-        currentProject = null;
-        currentFile = null;
-        await deleteProjectFromGithub(projectId);
-        renderProjectList();
-        renderArchivedList();
-    }
-});
-
-// =============================================
-// RENAME PROJECT
-// =============================================
-
-editProjectNameBtn?.addEventListener('click', () => {
-    projectName.contentEditable = 'true';
-    projectName.focus();
-    document.execCommand('selectAll', false, null);
-});
-
-projectName?.addEventListener('blur', async () => {
-    projectName.contentEditable = 'false';
-    const newName = projectName.textContent.trim();
-    
-    if (newName && newName !== currentProject.name) {
-        currentProject.name = newName;
-        await saveProjectToGithub(currentProject);
-        renderProjectList();
-        renderArchivedList();
-        showToast('Renamed', 'success');
-    } else {
-        projectName.textContent = currentProject.name;
-    }
-});
-
-projectName?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        projectName.blur();
-    }
-});
-
-// =============================================
-// NEW PROJECT
-// =============================================
-
-newProjectBtn?.addEventListener('click', () => {
-    document.getElementById('newProjectName').value = '';
-    document.getElementById('newProjectDesc').value = '';
-    document.getElementById('makePublic').checked = false;
-    document.querySelector('input[name="template"][value="blank"]').checked = true;
-    newProjectModal.classList.add('active');
-    document.getElementById('newProjectName').focus();
-});
-
-document.getElementById('createProjectBtn')?.addEventListener('click', async () => {
-    const name = document.getElementById('newProjectName').value.trim();
-    const description = document.getElementById('newProjectDesc').value.trim();
-    const template = document.querySelector('input[name="template"]:checked').value;
-    const isPublic = document.getElementById('makePublic').checked;
-    
-    if (!name) {
-        showToast('Enter project name', 'error');
-        return;
     }
     
-    const project = {
-        name,
-        description,
-        files: JSON.parse(JSON.stringify(templates[template].files)),
-        archived: false,
-        isPublic
-    };
+    const indices = [
+        0,  1,  2,    0,  2,  3,
+        4,  5,  6,    4,  6,  7,
+        8,  9, 10,    8, 10, 11,
+        12, 13, 14,   12, 14, 15,
+        16, 17, 18,   16, 18, 19,
+        20, 21, 22,   20, 22, 23,
+    ];
     
-    try {
-        const btn = document.getElementById('createProjectBtn');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Creating...';
-        
-        await saveProjectToGithub(project, true);
-        
-        closeAllModals();
-        renderProjectList();
-        selectProject(project.id);
-        showToast('Project created!', 'success');
-        
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fab fa-github"></i> Create on GitHub';
-    } catch (error) {
-        const btn = document.getElementById('createProjectBtn');
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fab fa-github"></i> Create on GitHub';
-    }
-});
-
-// =============================================
-// FILE OPERATIONS
-// =============================================
-
-addFileBtn?.addEventListener('click', () => {
-    document.getElementById('newFileName').value = '';
-    document.getElementById('newFileType').value = 'js';
-    newFileModal.classList.add('active');
-    document.getElementById('newFileName').focus();
-});
-
-document.getElementById('createFileBtn')?.addEventListener('click', async () => {
-    const name = document.getElementById('newFileName').value.trim();
-    const type = document.getElementById('newFileType').value;
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
     
-    if (!name || !/^[a-zA-Z0-9_-]+$/.test(name)) {
-        showToast('Invalid file name', 'error');
-        return;
-    }
+    const colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(generatedColors), gl.STATIC_DRAW);
     
-    const filename = `${name}.${type}`;
+    const indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
     
-    if (currentProject.files[filename]) {
-        showToast('File already exists', 'error');
-        return;
-    }
-    
-    currentProject.files[filename] = '';
-    await saveProjectToGithub(currentProject);
-    closeAllModals();
-    renderFileTabs();
-    selectFile(filename);
-    showToast('File added', 'success');
-});
-
-let contextMenuFile = null;
-
-function showFileContextMenu(e, filename) {
-    contextMenuFile = filename;
-    fileContextMenu.style.left = e.pageX + 'px';
-    fileContextMenu.style.top = e.pageY + 'px';
-    fileContextMenu.classList.add('active');
+    return { position: positionBuffer, color: colorBuffer, indices: indexBuffer };
 }
 
-document.addEventListener('click', () => fileContextMenu?.classList.remove('active'));
+const buffers = initBuffers(gl);
 
-fileContextMenu?.querySelectorAll('.context-menu-item').forEach(item => {
-    item.addEventListener('click', async () => {
-        const action = item.dataset.action;
+// Simple matrix functions
+function perspective(fov, aspect, near, far) {
+    const f = 1.0 / Math.tan(fov / 2);
+    const nf = 1 / (near - far);
+    return [
+        f / aspect, 0, 0, 0,
+        0, f, 0, 0,
+        0, 0, (far + near) * nf, -1,
+        0, 0, 2 * far * near * nf, 0
+    ];
+}
+
+function translate(m, v) {
+    const result = [...m];
+    result[12] = m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12];
+    result[13] = m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13];
+    result[14] = m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14];
+    return result;
+}
+
+function rotateY(m, angle) {
+    const s = Math.sin(angle);
+    const c = Math.cos(angle);
+    const result = [...m];
+    result[0] = m[0] * c - m[8] * s;
+    result[1] = m[1] * c - m[9] * s;
+    result[2] = m[2] * c - m[10] * s;
+    result[8] = m[0] * s + m[8] * c;
+    result[9] = m[1] * s + m[9] * c;
+    result[10] = m[2] * s + m[10] * c;
+    return result;
+}
+
+function rotateX(m, angle) {
+    const s = Math.sin(angle);
+    const c = Math.cos(angle);
+    const result = [...m];
+    result[4] = m[4] * c + m[8] * s;
+    result[5] = m[5] * c + m[9] * s;
+    result[6] = m[6] * c + m[10] * s;
+    result[8] = m[8] * c - m[4] * s;
+    result[9] = m[9] * c - m[5] * s;
+    result[10] = m[10] * c - m[6] * s;
+    return result;
+}
+
+let rotation = 0;
+
+function render(time) {
+    time *= 0.001;
+    rotation = time;
+    
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(0.1, 0.1, 0.15, 1.0);
+    gl.clearDepth(1.0);
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
+    const projectionMatrix = perspective(45 * Math.PI / 180, canvas.width / canvas.height, 0.1, 100.0);
+    let modelViewMatrix = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
+    modelViewMatrix = translate(modelViewMatrix, [0, 0, -6]);
+    modelViewMatrix = rotateY(modelViewMatrix, rotation);
+    modelViewMatrix = rotateX(modelViewMatrix, rotation * 0.7);
+    
+    // Bind position buffer
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+    gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+    
+    // Bind color buffer
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.color);
+    gl.vertexAttribPointer(programInfo.attribLocations.vertexColor, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(programInfo.attribLocations.vertexColor);
+    
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
+    gl.useProgram(programInfo.program);
+    
+    gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix, false, projectionMatrix);
+    gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix, false, modelViewMatrix);
+    
+    gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
+    
+    requestAnimationFrame(render);
+}
+
+requestAnimationFrame(render);
+console.log('WebGL 3D Game initialized!');`;
+        } else {
+            return `// Web App JavaScript
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('App initialized!');
+    
+    const app = document.getElementById('app');
+    
+    // Add some interactive content
+    const button = document.createElement('button');
+    button.textContent = 'Click Me!';
+    button.style.cssText = \`
+        display: block;
+        margin: 30px auto;
+        padding: 15px 30px;
+        font-size: 18px;
+        background: #6366f1;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: transform 0.2s, background 0.2s;
+    \`;
+    
+    button.addEventListener('mouseover', () => {
+        button.style.background = '#818cf8';
+        button.style.transform = 'scale(1.05)';
+    });
+    
+    button.addEventListener('mouseout', () => {
+        button.style.background = '#6366f1';
+        button.style.transform = 'scale(1)';
+    });
+    
+    let clickCount = 0;
+    button.addEventListener('click', () => {
+        clickCount++;
+        button.textContent = \`Clicked \${clickCount} times!\`;
+    });
+    
+    app.appendChild(button);
+});`;
+        }
+    }
+    
+    selectProject(projectId) {
+        this.currentProject = this.projects.find(p => p.id === projectId);
+        this.openTabs = [];
+        this.currentFile = null;
         
-        if (action === 'rename') {
-            const baseName = contextMenuFile.split('.').slice(0, -1).join('.');
-            document.getElementById('renameFileName').value = baseName;
-            renameFileModal.classList.add('active');
-            document.getElementById('renameFileName').focus();
-        } else if (action === 'delete') {
-            if (Object.keys(currentProject.files).length <= 1) {
-                showToast('Cannot delete last file', 'error');
-                return;
+        this.renderProjects();
+        this.renderFiles();
+        
+        document.getElementById('filesSection').style.display = this.currentProject ? 'flex' : 'none';
+        
+        if (this.currentProject && this.currentProject.files.length > 0) {
+            this.openFile(this.currentProject.files[0].name);
+        } else {
+            document.getElementById('codeEditor').value = '';
+            this.renderTabs();
+        }
+    }
+    
+    updateProjectTypeInfo(type) {
+        const info = document.getElementById('projectTypeInfo');
+        const descriptions = {
+            '2d': 'Create a 2D canvas-based game with sprite rendering capabilities.',
+            'app': 'Build a web application with HTML, CSS, and JavaScript.',
+            '3d': 'Create a WebGL-powered 3D game with shaders and 3D rendering.'
+        };
+        info.innerHTML = `<p>${descriptions[type]}</p>`;
+    }
+    
+    // File Methods
+    addFile() {
+        if (!this.currentProject) {
+            this.showToast('Please select a project first', 'error');
+            return;
+        }
+        
+        const nameInput = document.getElementById('newFileNameInput');
+        let name = nameInput.value.trim();
+        
+        if (!name) {
+            this.showToast('Please enter a file name', 'error');
+            return;
+        }
+        
+        // Check for duplicate
+        if (this.currentProject.files.find(f => f.name === name)) {
+            this.showToast('File already exists', 'error');
+            return;
+        }
+        
+        const file = {
+            name: name,
+            content: this.getFileTemplate(name)
+        };
+        
+        this.currentProject.files.push(file);
+        this.saveToStorage();
+        this.hideModal('addFileModal');
+        this.renderFiles();
+        this.openFile(name);
+        this.showToast(`File "${name}" created!`, 'success');
+    }
+    
+    getFileTemplate(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        switch (ext) {
+            case 'html':
+                return '<!DOCTYPE html>\n<html>\n<head>\n    <title>New Page</title>\n</head>\n<body>\n    \n</body>\n</html>';
+            case 'css':
+                return '/* Styles */\n';
+            case 'js':
+                return '// JavaScript\n';
+            case 'json':
+                return '{\n    \n}';
+            default:
+                return '';
+        }
+    }
+    
+    openFile(fileName) {
+        if (!this.currentProject) return;
+        
+        const file = this.currentProject.files.find(f => f.name === fileName);
+        if (!file) return;
+        
+        this.currentFile = file;
+        
+        // Add to tabs if not already open
+        if (!this.openTabs.includes(fileName)) {
+            this.openTabs.push(fileName);
+        }
+        
+        document.getElementById('codeEditor').value = file.content;
+        this.updateLineNumbers();
+        this.renderTabs();
+        this.renderFiles();
+        this.updateFileInfo();
+    }
+    
+    closeTab(fileName) {
+        const index = this.openTabs.indexOf(fileName);
+        if (index > -1) {
+            this.openTabs.splice(index, 1);
+        }
+        
+        if (this.currentFile && this.currentFile.name === fileName) {
+            if (this.openTabs.length > 0) {
+                this.openFile(this.openTabs[this.openTabs.length - 1]);
+            } else {
+                this.currentFile = null;
+                document.getElementById('codeEditor').value = '';
             }
+        }
+        
+        this.renderTabs();
+    }
+    
+    // Editor Methods
+    onEditorChange() {
+        if (this.currentFile) {
+            this.currentFile.content = document.getElementById('codeEditor').value;
+            this.updateLineNumbers();
             
-            if (confirm('Delete this file?')) {
-                delete currentProject.files[contextMenuFile];
-                await saveProjectToGithub(currentProject);
+            // Auto-save after delay
+            clearTimeout(this.saveTimeout);
+            this.saveTimeout = setTimeout(() => {
+                this.saveToStorage();
+            }, 1000);
+        }
+    }
+    
+    handleEditorKeydown(e) {
+        const editor = document.getElementById('codeEditor');
+        
+        // Tab key - insert spaces
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            editor.value = editor.value.substring(0, start) + '    ' + editor.value.substring(end);
+            editor.selectionStart = editor.selectionEnd = start + 4;
+            this.onEditorChange();
+        }
+        
+        // Auto-close brackets
+        const pairs = { '(': ')', '[': ']', '{': '}', '"': '"', "'": "'" };
+        if (pairs[e.key]) {
+            e.preventDefault();
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            const selected = editor.value.substring(start, end);
+            editor.value = editor.value.substring(0, start) + e.key + selected + pairs[e.key] + editor.value.substring(end);
+            editor.selectionStart = editor.selectionEnd = start + 1;
+            this.onEditorChange();
+        }
+    }
+    
+    updateLineNumbers() {
+        const editor = document.getElementById('codeEditor');
+        const lines = editor.value.split('\n').length;
+        const lineNumbers = document.getElementById('lineNumbers');
+        
+        let html = '';
+        for (let i = 1; i <= lines; i++) {
+            html += i + '\n';
+        }
+        lineNumbers.textContent = html;
+    }
+    
+    syncLineNumbers() {
+        const editor = document.getElementById('codeEditor');
+        const lineNumbers = document.getElementById('lineNumbers');
+        lineNumbers.scrollTop = editor.scrollTop;
+    }
+    
+    updateCursorPosition() {
+        const editor = document.getElementById('codeEditor');
+        const value = editor.value.substring(0, editor.selectionStart);
+        const lines = value.split('\n');
+        const line = lines.length;
+        const col = lines[lines.length - 1].length + 1;
+        
+        document.getElementById('cursorPosition').textContent = `Ln ${line}, Col ${col}`;
+    }
+    
+    updateFileInfo() {
+        const fileInfo = document.getElementById('currentFileInfo');
+        const fileType = document.getElementById('fileType');
+        
+        if (this.currentFile) {
+            const ext = this.currentFile.name.split('.').pop().toUpperCase();
+            fileType.textContent = ext;
+            fileInfo.textContent = this.currentFile.name;
+        } else {
+            fileType.textContent = '--';
+            fileInfo.textContent = '';
+        }
+    }
+    
+    // Render Methods
+    renderProjects() {
+        const container = document.getElementById('projectsList');
+        
+        if (this.projects.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📁</div>
+                    <div class="empty-state-text">No projects yet.<br>Create your first project!</div>
+                </div>
+            `;
+            return;
+        }
+        
+        const icons = { '2d': '🎮', 'app': '📱', '3d': '🎲' };
+        const types = { '2d': '2D Game', 'app': 'Web App', '3d': 'WebGL 3D' };
+        
+        container.innerHTML = this.projects.map(project => `
+            <div class="project-item ${this.currentProject?.id === project.id ? 'active' : ''}" 
+                 data-id="${project.id}"
+                 oncontextmenu="editor.showContextMenu(event, 'project', '${project.id}')">
+                <span class="project-icon">${icons[project.type]}</span>
+                <div class="project-info">
+                    <div class="project-name">${project.name}</div>
+                    <div class="project-type">${types[project.type]}</div>
+                </div>
+            </div>
+        `).join('');
+        
+        container.querySelectorAll('.project-item').forEach(item => {
+            item.addEventListener('click', () => this.selectProject(item.dataset.id));
+        });
+    }
+    
+    renderFiles() {
+        const container = document.getElementById('filesList');
+        
+        if (!this.currentProject) {
+            container.innerHTML = '';
+            return;
+        }
+        
+        const icons = {
+            'html': '📄',
+            'css': '🎨',
+            'js': '⚡',
+            'json': '📋',
+            'default': '📝'
+        };
+        
+        container.innerHTML = this.currentProject.files.map(file => {
+            const ext = file.name.split('.').pop().toLowerCase();
+            const icon = icons[ext] || icons.default;
+            return `
+                <div class="file-item ${this.currentFile?.name === file.name ? 'active' : ''}"
+                     data-name="${file.name}"
+                     oncontextmenu="editor.showContextMenu(event, 'file', '${file.name}')">
+                    <span class="file-icon">${icon}</span>
+                    <span class="file-name">${file.name}</span>
+                </div>
+            `;
+        }).join('');
+        
+        container.querySelectorAll('.file-item').forEach(item => {
+            item.addEventListener('click', () => this.openFile(item.dataset.name));
+        });
+    }
+    
+    renderTabs() {
+        const container = document.getElementById('filesTabs');
+        
+        const icons = {
+            'html': '📄',
+            'css': '🎨',
+            'js': '⚡',
+            'json': '📋',
+            'default': '📝'
+        };
+        
+        container.innerHTML = this.openTabs.map(fileName => {
+            const ext = fileName.split('.').pop().toLowerCase();
+            const icon = icons[ext] || icons.default;
+            return `
+                <div class="file-tab ${this.currentFile?.name === fileName ? 'active' : ''}" data-name="${fileName}">
+                    <span>${icon}</span>
+                    <span>${fileName}</span>
+                    <span class="tab-close" data-close="${fileName}">&times;</span>
+                </div>
+            `;
+        }).join('');
+        
+        container.querySelectorAll('.file-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('tab-close')) {
+                    this.openFile(tab.dataset.name);
+                }
+            });
+        });
+        
+        container.querySelectorAll('.tab-close').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.closeTab(btn.dataset.close);
+            });
+        });
+    }
+    
+    // Context Menu
+    showContextMenu(event, type, target) {
+        event.preventDefault();
+        
+        this.contextType = type;
+        this.contextTarget = target;
+        
+        const menu = document.getElementById('contextMenu');
+        menu.style.left = event.pageX + 'px';
+        menu.style.top = event.pageY + 'px';
+        menu.classList.add('active');
+    }
+    
+    hideContextMenu() {
+        document.getElementById('contextMenu').classList.remove('active');
+    }
+    
+    handleContextAction(action) {
+        this.hideContextMenu();
+        
+        switch (action) {
+            case 'rename':
+                this.showRenameModal();
+                break;
+            case 'duplicate':
+                this.duplicateItem();
+                break;
+            case 'delete':
+                this.deleteItem();
+                break;
+        }
+    }
+    
+    showRenameModal() {
+        const title = document.getElementById('renameTitle');
+        const input = document.getElementById('renameInput');
+        
+        if (this.contextType === 'project') {
+            const project = this.projects.find(p => p.id === this.contextTarget);
+            title.textContent = '✏️ Rename Project';
+            input.value = project?.name || '';
+        } else {
+            title.textContent = '✏️ Rename File';
+            input.value = this.contextTarget || '';
+        }
+        
+        this.showModal('renameModal');
+    }
+    
+    confirmRename() {
+        const newName = document.getElementById('renameInput').value.trim();
+        
+        if (!newName) {
+            this.showToast('Please enter a name', 'error');
+            return;
+        }
+        
+        if (this.contextType === 'project') {
+            const project = this.projects.find(p => p.id === this.contextTarget);
+            if (project) {
+                project.name = newName;
+                this.saveToStorage();
+                this.renderProjects();
+                this.showToast('Project renamed!', 'success');
+            }
+        } else {
+            if (this.currentProject) {
+                const file = this.currentProject.files.find(f => f.name === this.contextTarget);
+                if (file) {
+                    const oldName = file.name;
+                    file.name = newName;
+                    
+                    // Update tabs
+                    const tabIndex = this.openTabs.indexOf(oldName);
+                    if (tabIndex > -1) {
+                        this.openTabs[tabIndex] = newName;
+                    }
+                    
+                    if (this.currentFile?.name === oldName) {
+                        this.currentFile = file;
+                    }
+                    
+                    this.saveToStorage();
+                    this.renderFiles();
+                    this.renderTabs();
+                    this.showToast('File renamed!', 'success');
+                }
+            }
+        }
+        
+        this.hideModal('renameModal');
+    }
+    
+    duplicateItem() {
+        if (this.contextType === 'project') {
+            const project = this.projects.find(p => p.id === this.contextTarget);
+            if (project) {
+                const newProject = {
+                    ...JSON.parse(JSON.stringify(project)),
+                    id: Date.now().toString(),
+                    name: project.name + ' (Copy)',
+                    createdAt: new Date().toISOString()
+                };
+                this.projects.push(newProject);
+                this.saveToStorage();
+                this.renderProjects();
+                this.showToast('Project duplicated!', 'success');
+            }
+        } else {
+            if (this.currentProject) {
+                const file = this.currentProject.files.find(f => f.name === this.contextTarget);
+                if (file) {
+                    const ext = file.name.includes('.') ? '.' + file.name.split('.').pop() : '';
+                    const baseName = file.name.replace(ext, '');
+                    const newFile = {
+                        name: baseName + '_copy' + ext,
+                        content: file.content
+                    };
+                    this.currentProject.files.push(newFile);
+                    this.saveToStorage();
+                    this.renderFiles();
+                    this.showToast('File duplicated!', 'success');
+                }
+            }
+        }
+    }
+    
+    deleteItem() {
+        if (this.contextType === 'project') {
+            const index = this.projects.findIndex(p => p.id === this.contextTarget);
+            if (index > -1) {
+                const name = this.projects[index].name;
+                this.projects.splice(index, 1);
                 
-                if (currentFile === contextMenuFile) {
-                    currentFile = Object.keys(currentProject.files)[0];
+                if (this.currentProject?.id === this.contextTarget) {
+                    this.currentProject = null;
+                    this.currentFile = null;
+                    this.openTabs = [];
+                    document.getElementById('codeEditor').value = '';
+                    document.getElementById('filesSection').style.display = 'none';
                 }
                 
-                renderFileTabs();
-                if (currentFile) selectFile(currentFile);
-                showToast('File deleted', 'success');
+                this.saveToStorage();
+                this.renderProjects();
+                this.renderTabs();
+                this.showToast(`Project "${name}" deleted`, 'info');
+            }
+        } else {
+            if (this.currentProject) {
+                const index = this.currentProject.files.findIndex(f => f.name === this.contextTarget);
+                if (index > -1) {
+                    const name = this.currentProject.files[index].name;
+                    this.currentProject.files.splice(index, 1);
+                    
+                    // Close tab if open
+                    this.closeTab(this.contextTarget);
+                    
+                    this.saveToStorage();
+                    this.renderFiles();
+                    this.showToast(`File "${name}" deleted`, 'info');
+                }
             }
         }
-    });
-});
-
-document.getElementById('confirmRenameFileBtn')?.addEventListener('click', async () => {
-    const newBaseName = document.getElementById('renameFileName').value.trim();
-    
-    if (!newBaseName || !/^[a-zA-Z0-9_-]+$/.test(newBaseName)) {
-        showToast('Invalid name', 'error');
-        return;
     }
     
-    const ext = contextMenuFile.split('.').pop();
-    const newFilename = `${newBaseName}.${ext}`;
-    
-    if (currentProject.files[newFilename] && newFilename !== contextMenuFile) {
-        showToast('File already exists', 'error');
-        return;
-    }
-    
-    const content = currentProject.files[contextMenuFile];
-    delete currentProject.files[contextMenuFile];
-    currentProject.files[newFilename] = content;
-    
-    if (currentFile === contextMenuFile) {
-        currentFile = newFilename;
-    }
-    
-    await saveProjectToGithub(currentProject);
-    closeAllModals();
-    renderFileTabs();
-    selectFile(currentFile);
-    showToast('File renamed', 'success');
-});
-
-// =============================================
-// MODALS
-// =============================================
-
-document.querySelectorAll('.modal-close, .modal-cancel').forEach(btn => {
-    btn.addEventListener('click', closeAllModals);
-});
-
-document.querySelectorAll('.modal').forEach(modal => {
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeAllModals();
-    });
-});
-
-function closeAllModals() {
-    document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
-}
-
-document.getElementById('newProjectName')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('createProjectBtn').click();
-});
-
-document.getElementById('newFileName')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('createFileBtn').click();
-});
-
-document.getElementById('renameFileName')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('confirmRenameFileBtn').click();
-});
-
-document.getElementById('newTokenInput')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('saveNewTokenBtn').click();
-});
-
-// =============================================
-// SIDEBAR TABS
-// =============================================
-
-document.querySelectorAll('.sidebar-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        const view = tab.dataset.view;
+    // Run Project
+    runProject() {
+        if (!this.currentProject) {
+            this.showToast('Please select a project first', 'error');
+            return;
+        }
         
-        document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
+        const htmlFile = this.currentProject.files.find(f => f.name.endsWith('.html'));
+        if (!htmlFile) {
+            this.showToast('No HTML file found in project', 'error');
+            return;
+        }
         
-        document.querySelectorAll('.sidebar-view').forEach(v => v.classList.remove('active'));
-        document.getElementById(`${view}View`)?.classList.add('active');
-    });
-});
-
-// =============================================
-// UTILITIES
-// =============================================
-
-function showToast(message, type = 'info') {
-    const icons = {
-        success: 'fas fa-check-circle',
-        error: 'fas fa-exclamation-circle',
-        info: 'fas fa-info-circle'
-    };
-    
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `
-        <i class="toast-icon ${icons[type]}"></i>
-        <span class="toast-message">${escapeHtml(message)}</span>
-    `;
-    
-    document.getElementById('toastContainer')?.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(100%)';
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-window.addEventListener('beforeunload', () => {
-    saveCurrentFile();
-    if (runningGameWindow && !runningGameWindow.closed) {
-        runningGameWindow.close();
+        // Build the HTML with embedded CSS and JS
+        let html = htmlFile.content;
+        
+        // Inject CSS files
+        this.currentProject.files.filter(f => f.name.endsWith('.css')).forEach(file => {
+            const linkTag = new RegExp(`<link[^>]*href=["']${file.name}["'][^>]*>`, 'gi');
+            const styleContent = `<style>\n${file.content}\n</style>`;
+            html = html.replace(linkTag, styleContent);
+        });
+        
+        // Inject JS files
+        this.currentProject.files.filter(f => f.name.endsWith('.js')).forEach(file => {
+            const scriptTag = new RegExp(`<script[^>]*src=["']${file.name}["'][^>]*><\\/script>`, 'gi');
+            const scriptContent = `<script>\n${file.content}\n<\/script>`;
+            html = html.replace(scriptTag, scriptContent);
+        });
+        
+        // Create blob and run
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        
+        if (this.currentProject.type === '3d') {
+            // Open in popup window for WebGL
+            const width = 900;
+            const height = 700;
+            const left = (screen.width - width) / 2;
+            const top = (screen.height - height) / 2;
+            
+            const popup = window.open(
+                url,
+                'WebGL Preview',
+                `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no`
+            );
+            
+            if (popup) {
+                popup.focus();
+                this.showToast('WebGL preview opened in popup window', 'success');
+            } else {
+                this.showToast('Popup blocked! Please allow popups for this site.', 'error');
+            }
+        } else {
+            // Open in new tab for 2D and App
+            const newTab = window.open(url, '_blank');
+            if (newTab) {
+                newTab.focus();
+                this.showToast('Project opened in new tab', 'success');
+            } else {
+                this.showToast('Popup blocked! Please allow popups for this site.', 'error');
+            }
+        }
+        
+        // Clean up URL after a delay
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
-});
+    
+    // Toast Notifications
+    showToast(message, type = 'info') {
+        const container = document.getElementById('toastContainer');
+        
+        const icons = {
+            success: '✓',
+            error: '✕',
+            info: 'ℹ'
+        };
+        
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerHTML = `
+            <span class="toast-icon">${icons[type]}</span>
+            <span class="toast-message">${message}</span>
+        `;
+        
+        container.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.animation = 'toastSlideIn 0.3s ease reverse';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+}
 
-// =============================================
-// INITIALIZE
-// =============================================
-
-document.addEventListener('DOMContentLoaded', init);
-
-console.log('📝 Game Editor loaded - Settings & Theme Support');
+// Initialize editor
+const editor = new GameEditor();

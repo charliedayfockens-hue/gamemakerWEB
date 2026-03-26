@@ -1,1186 +1,1389 @@
-// WebGL Game Editor - Main Application
+// ==================== DATA LAYER ====================
+const STORAGE_KEY = 'gameforge_projects';
 
-// Global state
-var projects = [];
-var currentProject = null;
-var currentFile = null;
-var openTabs = [];
-var contextTarget = null;
-var contextType = null;
-var saveTimeout = null;
-
-// Initialize when page loads
-window.onload = function() {
-    console.log("Page loaded, initializing editor...");
-    loadFromStorage();
-    bindEvents();
-    renderProjects();
-    updateLineNumbers();
-    console.log("Editor initialized!");
-};
-
-// Storage Methods
-function loadFromStorage() {
+function loadProjects() {
     try {
-        var saved = localStorage.getItem('gameEditorProjects');
-        if (saved) {
-            projects = JSON.parse(saved);
-            console.log("Loaded " + projects.length + " projects from storage");
-        }
-    } catch (e) {
-        console.error('Error loading from storage:', e);
-        projects = [];
+        const data = localStorage.getItem(STORAGE_KEY);
+        return data ? JSON.parse(data) : [];
+    } catch {
+        return [];
     }
 }
 
-function saveToStorage() {
-    try {
-        localStorage.setItem('gameEditorProjects', JSON.stringify(projects));
-        console.log("Saved to storage");
-    } catch (e) {
-        console.error('Error saving to storage:', e);
-    }
+function saveProjects(projects) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
 }
 
-// Event Binding
-function bindEvents() {
-    console.log("Binding events...");
-    
-    // New Project Button
-    var newProjectBtn = document.getElementById('newProjectBtn');
-    if (newProjectBtn) {
-        newProjectBtn.onclick = function() {
-            console.log("New Project button clicked");
-            showModal('newProjectModal');
-        };
-    }
-    
-    // Run Project Button
-    var runProjectBtn = document.getElementById('runProjectBtn');
-    if (runProjectBtn) {
-        runProjectBtn.onclick = function() {
-            console.log("Run Project button clicked");
-            runProject();
-        };
-    }
-    
-    // Create Project Button
-    var createProjectBtn = document.getElementById('createProjectBtn');
-    if (createProjectBtn) {
-        createProjectBtn.onclick = function() {
-            console.log("Create Project button clicked");
-            createProject();
-        };
-    } else {
-        console.error("createProjectBtn not found!");
-    }
-    
-    // Cancel Project Button
-    var cancelProjectBtn = document.getElementById('cancelProjectBtn');
-    if (cancelProjectBtn) {
-        cancelProjectBtn.onclick = function() {
-            hideModal('newProjectModal');
-        };
-    }
-    
-    // Project Type Select
-    var projectTypeSelect = document.getElementById('projectTypeSelect');
-    if (projectTypeSelect) {
-        projectTypeSelect.onchange = function() {
-            updateProjectTypeInfo(this.value);
-        };
-    }
-    
-    // Rename Modal Buttons
-    var confirmRenameBtn = document.getElementById('confirmRenameBtn');
-    if (confirmRenameBtn) {
-        confirmRenameBtn.onclick = function() {
-            confirmRename();
-        };
-    }
-    
-    var cancelRenameBtn = document.getElementById('cancelRenameBtn');
-    if (cancelRenameBtn) {
-        cancelRenameBtn.onclick = function() {
-            hideModal('renameModal');
-        };
-    }
-    
-    // Add File Modal Buttons
-    var addFileBtn = document.getElementById('addFileBtn');
-    if (addFileBtn) {
-        addFileBtn.onclick = function() {
-            showModal('addFileModal');
-        };
-    }
-    
-    var confirmAddFileBtn = document.getElementById('confirmAddFileBtn');
-    if (confirmAddFileBtn) {
-        confirmAddFileBtn.onclick = function() {
-            addFile();
-        };
-    }
-    
-    var cancelAddFileBtn = document.getElementById('cancelAddFileBtn');
-    if (cancelAddFileBtn) {
-        cancelAddFileBtn.onclick = function() {
-            hideModal('addFileModal');
-        };
-    }
-    
-    // Template Buttons
-    var templateBtns = document.querySelectorAll('.template-btn');
-    templateBtns.forEach(function(btn) {
-        btn.onclick = function() {
-            var ext = this.getAttribute('data-ext');
-            var input = document.getElementById('newFileNameInput');
-            if (input) {
-                input.value = 'newfile' + ext;
-            }
-        };
-    });
-    
-    // Modal Close Buttons
-    var closeButtons = document.querySelectorAll('.modal-close');
-    closeButtons.forEach(function(btn) {
-        btn.onclick = function() {
-            var modalId = this.getAttribute('data-modal');
-            if (modalId) {
-                hideModal(modalId);
-            }
-        };
-    });
-    
-    // Modal Overlays
-    var overlays = document.querySelectorAll('.modal-overlay');
-    overlays.forEach(function(overlay) {
-        overlay.onclick = function() {
-            var modal = this.parentElement;
-            if (modal) {
-                modal.classList.remove('active');
-            }
-        };
-    });
-    
-    // Code Editor
-    var editor = document.getElementById('codeEditor');
-    if (editor) {
-        editor.oninput = function() {
-            onEditorChange();
-        };
-        editor.onkeydown = function(e) {
-            handleEditorKeydown(e);
-        };
-        editor.onscroll = function() {
-            syncLineNumbers();
-        };
-        editor.onclick = function() {
-            updateCursorPosition();
-        };
-        editor.onkeyup = function() {
-            updateCursorPosition();
-        };
-    }
-    
-    // Context Menu - hide on click
-    document.onclick = function() {
-        hideContextMenu();
+function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+}
+
+function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const icons = {
+        'html': '🟧',
+        'htm': '🟧',
+        'css': '🟦',
+        'js': '🟨',
+        'json': '🟩',
+        'md': '📝',
+        'txt': '📄',
+        'glsl': '🔮',
+        'vert': '🔮',
+        'frag': '🔮',
+        'png': '🖼️',
+        'jpg': '🖼️',
+        'svg': '🖼️',
     };
-    
-    // Context Menu Items
-    var contextItems = document.querySelectorAll('.context-menu-item');
-    contextItems.forEach(function(item) {
-        item.onclick = function(e) {
-            e.stopPropagation();
-            var action = this.getAttribute('data-action');
-            if (action) {
-                handleContextAction(action);
-            }
-        };
-    });
-    
-    // Keyboard Shortcuts
-    document.onkeydown = function(e) {
-        if (e.ctrlKey && e.key === 's') {
-            e.preventDefault();
-            saveToStorage();
-            showToast('Project saved', 'success');
-        }
-    };
-    
-    // Enter key in project name input
-    var projectNameInput = document.getElementById('projectNameInput');
-    if (projectNameInput) {
-        projectNameInput.onkeydown = function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                createProject();
-            }
-        };
-    }
-    
-    // Enter key in rename input
-    var renameInput = document.getElementById('renameInput');
-    if (renameInput) {
-        renameInput.onkeydown = function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                confirmRename();
-            }
-        };
-    }
-    
-    // Enter key in new file name input
-    var newFileNameInput = document.getElementById('newFileNameInput');
-    if (newFileNameInput) {
-        newFileNameInput.onkeydown = function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                addFile();
-            }
-        };
-    }
-    
-    console.log("Events bound successfully");
-}
-
-// Modal Methods
-function showModal(modalId) {
-    console.log("Showing modal: " + modalId);
-    var modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.add('active');
-        var input = modal.querySelector('input');
-        if (input) {
-            input.value = '';
-            input.focus();
-        }
-    } else {
-        console.error("Modal not found: " + modalId);
-    }
-}
-
-function hideModal(modalId) {
-    console.log("Hiding modal: " + modalId);
-    var modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.remove('active');
-    }
-}
-
-// Create Project
-function createProject() {
-    console.log("createProject() called");
-    
-    var nameInput = document.getElementById('projectNameInput');
-    var typeSelect = document.getElementById('projectTypeSelect');
-    
-    if (!nameInput) {
-        console.error("projectNameInput not found!");
-        return;
-    }
-    
-    if (!typeSelect) {
-        console.error("projectTypeSelect not found!");
-        return;
-    }
-    
-    var name = nameInput.value.trim();
-    var type = typeSelect.value;
-    
-    console.log("Project name: " + name);
-    console.log("Project type: " + type);
-    
-    if (!name) {
-        showToast('Please enter a project name', 'error');
-        nameInput.focus();
-        return;
-    }
-    
-    var project = {
-        id: Date.now().toString(),
-        name: name,
-        type: type,
-        files: getDefaultFiles(type),
-        createdAt: new Date().toISOString()
-    };
-    
-    console.log("Created project:", project);
-    
-    projects.push(project);
-    saveToStorage();
-    hideModal('newProjectModal');
-    renderProjects();
-    selectProject(project.id);
-    showToast('Project "' + name + '" created!', 'success');
+    return icons[ext] || '📄';
 }
 
 function getDefaultFiles(type) {
+    const files = {};
+
+    if (type === '2d') {
+        files['index.html'] = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <script src="game.js"><\/script>
+</body>
+</html>`;
+
+        files['style.css'] = `* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: #1a1a2e;
+}
+
+canvas {
+    border: 2px solid #e94560;
+    border-radius: 4px;
+    box-shadow: 0 0 30px rgba(233, 69, 96, 0.3);
+}`;
+
+        files['game.js'] = `const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Player
+const player = {
+    x: canvas.width / 2 - 25,
+    y: canvas.height - 60,
+    width: 50,
+    height: 50,
+    speed: 5,
+    color: '#e94560'
+};
+
+// Input
+const keys = {};
+window.addEventListener('keydown', e => keys[e.key] = true);
+window.addEventListener('keyup', e => keys[e.key] = false);
+
+// Game loop
+function update() {
+    if (keys['ArrowLeft'] || keys['a']) player.x -= player.speed;
+    if (keys['ArrowRight'] || keys['d']) player.x += player.speed;
+    if (keys['ArrowUp'] || keys['w']) player.y -= player.speed;
+    if (keys['ArrowDown'] || keys['s']) player.y += player.speed;
+
+    // Bounds
+    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+    player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+}
+
+function draw() {
+    ctx.fillStyle = '#0f3460';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    for (let x = 0; x < canvas.width; x += 40) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += 40) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+
+    // Player
+    ctx.fillStyle = player.color;
+    ctx.shadowColor = player.color;
+    ctx.shadowBlur = 20;
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+    ctx.shadowBlur = 0;
+
+    // Instructions
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '14px sans-serif';
+    ctx.fillText('Use WASD or Arrow Keys to move', 10, 25);
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+console.log('2D Game started!');`;
+
+    } else if (type === 'app') {
+        files['index.html'] = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web App</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <header>
+            <h1>My Web App</h1>
+            <p class="subtitle">Built with GameForge Editor</p>
+        </header>
+        <main>
+            <div class="card">
+                <h2>Welcome!</h2>
+                <p>Start building your web application.</p>
+                <button id="actionBtn" class="btn">Click Me</button>
+                <p id="output" class="output"></p>
+            </div>
+        </main>
+    </div>
+    <script src="app.js"><\/script>
+</body>
+</html>`;
+
+        files['style.css'] = `* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #0c0c1d, #1a1a3e);
+    min-height: 100vh;
+    color: #e0e0e0;
+}
+
+.app {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+header h1 {
+    font-size: 2.5em;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+    color: #888;
+    margin-top: 8px;
+}
+
+.card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 32px;
+    backdrop-filter: blur(10px);
+}
+
+.card h2 {
+    margin-bottom: 12px;
+}
+
+.card p {
+    color: #aaa;
+    margin-bottom: 20px;
+}
+
+.btn {
+    padding: 12px 28px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+}
+
+.output {
+    margin-top: 20px;
+    padding: 12px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 8px;
+    font-family: monospace;
+    min-height: 20px;
+}`;
+
+        files['app.js'] = `let clickCount = 0;
+
+const btn = document.getElementById('actionBtn');
+const output = document.getElementById('output');
+
+btn.addEventListener('click', () => {
+    clickCount++;
+    const messages = [
+        'Hello, World! 👋',
+        'You clicked again! 🎉',
+        'Keep going! 🚀',
+        'You\\'re on fire! 🔥',
+        'Unstoppable! ⚡'
+    ];
+    const msg = messages[Math.min(clickCount - 1, messages.length - 1)];
+    output.textContent = \`Click #\${clickCount}: \${msg}\`;
+});
+
+console.log('Web App loaded!');`;
+
+    } else if (type === 'webgl') {
+        files['index.html'] = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL 3D</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <canvas id="glCanvas"></canvas>
+    <div id="info">WebGL 3D - Rotating Cube</div>
+    <script src="main.js"><\/script>
+</body>
+</html>`;
+
+        files['style.css'] = `* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    overflow: hidden;
+    background: #000;
+}
+
+canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+}
+
+#info {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    color: rgba(255,255,255,0.6);
+    font-family: monospace;
+    font-size: 14px;
+    pointer-events: none;
+}`;
+
+        files['main.js'] = `const canvas = document.getElementById('glCanvas');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const gl = canvas.getContext('webgl');
+if (!gl) {
+    alert('WebGL not supported!');
+    throw new Error('WebGL not supported');
+}
+
+// Vertex shader
+const vsSource = \`
+    attribute vec4 aPosition;
+    attribute vec4 aColor;
+    uniform mat4 uModelViewMatrix;
+    uniform mat4 uProjectionMatrix;
+    varying lowp vec4 vColor;
+    void main() {
+        gl_Position = uProjectionMatrix * uModelViewMatrix * aPosition;
+        vColor = aColor;
+    }
+\`;
+
+// Fragment shader
+const fsSource = \`
+    varying lowp vec4 vColor;
+    void main() {
+        gl_FragColor = vColor;
+    }
+\`;
+
+function createShader(gl, type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+    }
+    return shader;
+}
+
+const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
+const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+const program = gl.createProgram();
+gl.attachShader(program, vs);
+gl.attachShader(program, fs);
+gl.linkProgram(program);
+
+if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    console.error(gl.getProgramInfoLog(program));
+}
+
+const aPosition = gl.getAttribLocation(program, 'aPosition');
+const aColor = gl.getAttribLocation(program, 'aColor');
+const uModelView = gl.getUniformLocation(program, 'uModelViewMatrix');
+const uProjection = gl.getUniformLocation(program, 'uProjectionMatrix');
+
+// Cube vertices
+const positions = [
+    // Front
+    -1,-1, 1,  1,-1, 1,  1, 1, 1, -1, 1, 1,
+    // Back
+    -1,-1,-1, -1, 1,-1,  1, 1,-1,  1,-1,-1,
+    // Top
+    -1, 1,-1, -1, 1, 1,  1, 1, 1,  1, 1,-1,
+    // Bottom
+    -1,-1,-1,  1,-1,-1,  1,-1, 1, -1,-1, 1,
+    // Right
+     1,-1,-1,  1, 1,-1,  1, 1, 1,  1,-1, 1,
+    // Left
+    -1,-1,-1, -1,-1, 1, -1, 1, 1, -1, 1,-1,
+];
+
+const faceColors = [
+    [1.0, 0.3, 0.3, 1.0], // Front - red
+    [0.3, 1.0, 0.3, 1.0], // Back - green
+    [0.3, 0.3, 1.0, 1.0], // Top - blue
+    [1.0, 1.0, 0.3, 1.0], // Bottom - yellow
+    [1.0, 0.3, 1.0, 1.0], // Right - purple
+    [0.3, 1.0, 1.0, 1.0], // Left - cyan
+];
+
+let colors = [];
+faceColors.forEach(c => { for(let i = 0; i < 4; i++) colors = colors.concat(c); });
+
+const indices = [
+    0,1,2,  0,2,3,    4,5,6,  4,6,7,
+    8,9,10, 8,10,11,  12,13,14, 12,14,15,
+    16,17,18, 16,18,19, 20,21,22, 20,22,23
+];
+
+const posBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+const colBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, colBuf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+
+const idxBuf = gl.createBuffer();
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+// Simple matrix math
+function perspective(fov, aspect, near, far) {
+    const f = 1.0 / Math.tan(fov / 2);
+    const nf = 1 / (near - far);
     return [
-        { name: 'index.html', content: getHTMLTemplate(type) },
-        { name: 'styles.css', content: getCSSTemplate(type) },
-        { name: 'main.js', content: getJSTemplate(type) }
+        f/aspect, 0, 0, 0,
+        0, f, 0, 0,
+        0, 0, (far+near)*nf, -1,
+        0, 0, 2*far*near*nf, 0
     ];
 }
 
-function getHTMLTemplate(type) {
-    var titles = { '2d': '2D Game', 'app': 'Web App', '3d': 'WebGL 3D Game' };
-    var html = '<!DOCTYPE html>\n';
-    html += '<html lang="en">\n';
-    html += '<head>\n';
-    html += '    <meta charset="UTF-8">\n';
-    html += '    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n';
-    html += '    <title>' + titles[type] + '</title>\n';
-    html += '    <link rel="stylesheet" href="styles.css">\n';
-    html += '</head>\n';
-    html += '<body>\n';
-    
-    if (type === '2d') {
-        html += '    <canvas id="gameCanvas"></canvas>\n';
-    } else if (type === '3d') {
-        html += '    <canvas id="glCanvas"></canvas>\n';
-    } else {
-        html += '    <div id="app">\n';
-        html += '        <h1>Welcome to My App</h1>\n';
-        html += '    </div>\n';
-    }
-    
-    html += '    <script src="main.js"><\/script>\n';
-    html += '</body>\n';
-    html += '</html>';
-    
-    return html;
+function multiply(a, b) {
+    const r = new Array(16).fill(0);
+    for(let i=0;i<4;i++) for(let j=0;j<4;j++) for(let k=0;k<4;k++)
+        r[j*4+i] += a[k*4+i]*b[j*4+k];
+    return r;
 }
 
-function getCSSTemplate(type) {
-    var css = '* {\n';
-    css += '    margin: 0;\n';
-    css += '    padding: 0;\n';
-    css += '    box-sizing: border-box;\n';
-    css += '}\n\n';
-    css += 'body {\n';
-    css += '    font-family: Arial, sans-serif;\n';
-    css += '    background: #1a1a2e;\n';
-    css += '    color: white;\n';
-    css += '    min-height: 100vh;\n';
-    
-    if (type === '2d' || type === '3d') {
-        css += '    display: flex;\n';
-        css += '    justify-content: center;\n';
-        css += '    align-items: center;\n';
-        css += '    overflow: hidden;\n';
-        css += '}\n\n';
-        css += 'canvas {\n';
-        css += '    border: 2px solid #4a4a6a;\n';
-        css += '    border-radius: 8px;\n';
-        css += '}';
-    } else {
-        css += '}\n\n';
-        css += '#app {\n';
-        css += '    max-width: 1200px;\n';
-        css += '    margin: 0 auto;\n';
-        css += '    padding: 20px;\n';
-        css += '}\n\n';
-        css += 'h1 {\n';
-        css += '    text-align: center;\n';
-        css += '    margin-top: 50px;\n';
-        css += '}';
-    }
-    
-    return css;
+function rotateY(m, a) {
+    const c=Math.cos(a), s=Math.sin(a);
+    const r=[c,0,s,0, 0,1,0,0, -s,0,c,0, 0,0,0,1];
+    return multiply(m,r);
 }
 
-function getJSTemplate(type) {
-    if (type === '2d') {
-        return get2DTemplate();
-    } else if (type === '3d') {
-        return get3DTemplate();
-    } else {
-        return getAppTemplate();
-    }
+function rotateX(m, a) {
+    const c=Math.cos(a), s=Math.sin(a);
+    const r=[1,0,0,0, 0,c,-s,0, 0,s,c,0, 0,0,0,1];
+    return multiply(m,r);
 }
 
-function get2DTemplate() {
-    var js = '// 2D Game Setup\n';
-    js += 'var canvas = document.getElementById("gameCanvas");\n';
-    js += 'var ctx = canvas.getContext("2d");\n\n';
-    js += 'canvas.width = 800;\n';
-    js += 'canvas.height = 600;\n\n';
-    js += '// Game variables\n';
-    js += 'var player = {\n';
-    js += '    x: canvas.width / 2,\n';
-    js += '    y: canvas.height / 2,\n';
-    js += '    size: 30,\n';
-    js += '    speed: 5,\n';
-    js += '    color: "#6366f1"\n';
-    js += '};\n\n';
-    js += 'var keys = {};\n\n';
-    js += '// Input handling\n';
-    js += 'document.addEventListener("keydown", function(e) { keys[e.key] = true; });\n';
-    js += 'document.addEventListener("keyup", function(e) { keys[e.key] = false; });\n\n';
-    js += '// Game loop\n';
-    js += 'function gameLoop() {\n';
-    js += '    update();\n';
-    js += '    render();\n';
-    js += '    requestAnimationFrame(gameLoop);\n';
-    js += '}\n\n';
-    js += 'function update() {\n';
-    js += '    if (keys["ArrowUp"] || keys["w"]) player.y -= player.speed;\n';
-    js += '    if (keys["ArrowDown"] || keys["s"]) player.y += player.speed;\n';
-    js += '    if (keys["ArrowLeft"] || keys["a"]) player.x -= player.speed;\n';
-    js += '    if (keys["ArrowRight"] || keys["d"]) player.x += player.speed;\n\n';
-    js += '    player.x = Math.max(player.size, Math.min(canvas.width - player.size, player.x));\n';
-    js += '    player.y = Math.max(player.size, Math.min(canvas.height - player.size, player.y));\n';
-    js += '}\n\n';
-    js += 'function render() {\n';
-    js += '    ctx.fillStyle = "#1a1a2e";\n';
-    js += '    ctx.fillRect(0, 0, canvas.width, canvas.height);\n\n';
-    js += '    ctx.fillStyle = player.color;\n';
-    js += '    ctx.beginPath();\n';
-    js += '    ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);\n';
-    js += '    ctx.fill();\n\n';
-    js += '    ctx.fillStyle = "white";\n';
-    js += '    ctx.font = "16px Arial";\n';
-    js += '    ctx.fillText("Use WASD or Arrow keys to move", 20, 30);\n';
-    js += '}\n\n';
-    js += 'gameLoop();\n';
-    js += 'console.log("2D Game initialized!");';
-    return js;
+function translate(m, x, y, z) {
+    const t=[1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1];
+    return multiply(m,t);
 }
 
-function get3DTemplate() {
-    var js = '// WebGL 3D Game Setup\n';
-    js += 'var canvas = document.getElementById("glCanvas");\n';
-    js += 'var gl = canvas.getContext("webgl");\n\n';
-    js += 'canvas.width = 800;\n';
-    js += 'canvas.height = 600;\n\n';
-    js += 'if (!gl) {\n';
-    js += '    alert("WebGL not supported!");\n';
-    js += '}\n\n';
-    js += '// Vertex shader source\n';
-    js += 'var vsSource = "";\n';
-    js += 'vsSource += "attribute vec4 aVertexPosition;";\n';
-    js += 'vsSource += "attribute vec4 aVertexColor;";\n';
-    js += 'vsSource += "uniform mat4 uModelViewMatrix;";\n';
-    js += 'vsSource += "uniform mat4 uProjectionMatrix;";\n';
-    js += 'vsSource += "varying lowp vec4 vColor;";\n';
-    js += 'vsSource += "void main() {";\n';
-    js += 'vsSource += "  gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;";\n';
-    js += 'vsSource += "  vColor = aVertexColor;";\n';
-    js += 'vsSource += "}";\n\n';
-    js += '// Fragment shader source\n';
-    js += 'var fsSource = "";\n';
-    js += 'fsSource += "varying lowp vec4 vColor;";\n';
-    js += 'fsSource += "void main() {";\n';
-    js += 'fsSource += "  gl_FragColor = vColor;";\n';
-    js += 'fsSource += "}";\n\n';
-    js += '// Create shader\n';
-    js += 'function loadShader(gl, type, source) {\n';
-    js += '    var shader = gl.createShader(type);\n';
-    js += '    gl.shaderSource(shader, source);\n';
-    js += '    gl.compileShader(shader);\n';
-    js += '    return shader;\n';
-    js += '}\n\n';
-    js += 'var vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);\n';
-    js += 'var fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);\n\n';
-    js += 'var shaderProgram = gl.createProgram();\n';
-    js += 'gl.attachShader(shaderProgram, vertexShader);\n';
-    js += 'gl.attachShader(shaderProgram, fragmentShader);\n';
-    js += 'gl.linkProgram(shaderProgram);\n';
-    js += 'gl.useProgram(shaderProgram);\n\n';
-    js += '// Simple rotating square\n';
-    js += 'var rotation = 0;\n\n';
-    js += 'function render() {\n';
-    js += '    rotation += 0.01;\n';
-    js += '    gl.viewport(0, 0, canvas.width, canvas.height);\n';
-    js += '    gl.clearColor(0.1, 0.1, 0.2, 1.0);\n';
-    js += '    gl.clear(gl.COLOR_BUFFER_BIT);\n\n';
-    js += '    // Draw a simple colored background that changes\n';
-    js += '    var r = Math.sin(rotation) * 0.5 + 0.5;\n';
-    js += '    var g = Math.sin(rotation + 2) * 0.5 + 0.5;\n';
-    js += '    var b = Math.sin(rotation + 4) * 0.5 + 0.5;\n';
-    js += '    gl.clearColor(r * 0.3, g * 0.3, b * 0.3, 1.0);\n';
-    js += '    gl.clear(gl.COLOR_BUFFER_BIT);\n\n';
-    js += '    requestAnimationFrame(render);\n';
-    js += '}\n\n';
-    js += 'render();\n';
-    js += 'console.log("WebGL 3D Game initialized!");';
-    return js;
+const identity = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
+
+let rotation = 0;
+
+function render() {
+    rotation += 0.01;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    gl.viewport(0, 0, canvas.width, canvas.height);
+
+    gl.clearColor(0.06, 0.06, 0.12, 1.0);
+    gl.clearDepth(1.0);
+    gl.enable(gl.DEPTH_TEST);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    const proj = perspective(45*Math.PI/180, canvas.width/canvas.height, 0.1, 100);
+    let mv = translate([...identity], 0, 0, -6);
+    mv = rotateY(mv, rotation);
+    mv = rotateX(mv, rotation * 0.7);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+    gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(aPosition);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, colBuf);
+    gl.vertexAttribPointer(aColor, 4, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(aColor);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+    gl.useProgram(program);
+    gl.uniformMatrix4fv(uProjection, false, proj);
+    gl.uniformMatrix4fv(uModelView, false, mv);
+
+    gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
+    requestAnimationFrame(render);
 }
 
-function getAppTemplate() {
-    var js = '// Web App JavaScript\n';
-    js += 'document.addEventListener("DOMContentLoaded", function() {\n';
-    js += '    console.log("App initialized!");\n\n';
-    js += '    var app = document.getElementById("app");\n\n';
-    js += '    var button = document.createElement("button");\n';
-    js += '    button.textContent = "Click Me!";\n';
-    js += '    button.style.display = "block";\n';
-    js += '    button.style.margin = "30px auto";\n';
-    js += '    button.style.padding = "15px 30px";\n';
-    js += '    button.style.fontSize = "18px";\n';
-    js += '    button.style.background = "#6366f1";\n';
-    js += '    button.style.color = "white";\n';
-    js += '    button.style.border = "none";\n';
-    js += '    button.style.borderRadius = "8px";\n';
-    js += '    button.style.cursor = "pointer";\n\n';
-    js += '    var clickCount = 0;\n';
-    js += '    button.onclick = function() {\n';
-    js += '        clickCount++;\n';
-    js += '        button.textContent = "Clicked " + clickCount + " times!";\n';
-    js += '    };\n\n';
-    js += '    app.appendChild(button);\n';
-    js += '});';
-    return js;
+render();
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
+
+console.log('WebGL 3D Engine started!');`;
+    }
+
+    return files;
 }
 
-// Select Project
-function selectProject(projectId) {
-    console.log("Selecting project: " + projectId);
-    
-    currentProject = null;
-    for (var i = 0; i < projects.length; i++) {
-        if (projects[i].id === projectId) {
-            currentProject = projects[i];
-            break;
-        }
-    }
-    
-    openTabs = [];
-    currentFile = null;
-    
-    renderProjects();
-    renderFiles();
-    
-    var filesSection = document.getElementById('filesSection');
-    if (filesSection) {
-        filesSection.style.display = currentProject ? 'flex' : 'none';
-    }
-    
-    if (currentProject && currentProject.files.length > 0) {
-        openFile(currentProject.files[0].name);
-    } else {
-        var editor = document.getElementById('codeEditor');
-        if (editor) editor.value = '';
-        renderTabs();
-    }
+// ==================== APP STATE ====================
+let projects = loadProjects();
+let currentProjectId = null;
+let currentFileId = null;
+let openTabs = [];
+let contextTarget = null;
+let autoSaveTimer = null;
+
+// ==================== DOM REFERENCES ====================
+const $ = id => document.getElementById(id);
+
+const dashboard = $('dashboard');
+const editorView = $('editor');
+const projectGrid = $('projectGrid');
+const emptyState = $('emptyState');
+const searchInput = $('searchProjects');
+
+const newProjectModal = $('newProjectModal');
+const projectNameInput = $('projectName');
+const typeCards = document.querySelectorAll('.type-card');
+let selectedType = '2d';
+
+const renameModal = $('renameModal');
+const renameInput = $('renameInput');
+const renameModalTitle = $('renameModalTitle');
+const renameLabel = $('renameLabel');
+let renameCallback = null;
+
+const addFileModal = $('addFileModal');
+const newFileNameInput = $('newFileName');
+
+const editorProjectName = $('editorProjectName');
+const projectTypeBadge = $('projectTypeBadge');
+const fileList = $('fileList');
+const codeTabs = $('codeTabs');
+const codeEditor = $('codeEditor');
+const lineNumbers = $('lineNumbers');
+
+const webglPreview = $('webglPreview');
+const webglFrame = $('webglFrame');
+
+const contextMenu = $('contextMenu');
+const toastContainer = $('toastContainer');
+
+// ==================== TOAST ====================
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    toastContainer.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(20px)';
+        toast.style.transition = '0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
 
-function updateProjectTypeInfo(type) {
-    var info = document.getElementById('projectTypeInfo');
-    if (!info) return;
-    
-    var descriptions = {
-        '2d': 'Create a 2D canvas-based game with sprite rendering.',
-        'app': 'Build a web application with HTML, CSS, and JavaScript.',
-        '3d': 'Create a WebGL-powered 3D game with shaders.'
-    };
-    info.innerHTML = '<p>' + descriptions[type] + '</p>';
+// ==================== SAVE ====================
+function autoSave() {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => {
+        saveProjects(projects);
+    }, 300);
 }
 
-// File Methods
-function addFile() {
-    if (!currentProject) {
-        showToast('Please select a project first', 'error');
-        return;
-    }
-    
-    var nameInput = document.getElementById('newFileNameInput');
-    if (!nameInput) return;
-    
-    var name = nameInput.value.trim();
-    
-    if (!name) {
-        showToast('Please enter a file name', 'error');
-        return;
-    }
-    
-    // Check duplicate
-    for (var i = 0; i < currentProject.files.length; i++) {
-        if (currentProject.files[i].name === name) {
-            showToast('File already exists', 'error');
-            return;
-        }
-    }
-    
-    var file = {
+function getCurrentProject() {
+    return projects.find(p => p.id === currentProjectId);
+}
+
+// ==================== DASHBOARD ====================
+function renderDashboard(filter = '') {
+    const filtered = projects.filter(p =>
+        p.name.toLowerCase().includes(filter.toLowerCase())
+    );
+
+    projectGrid.innerHTML = '';
+    emptyState.style.display = filtered.length === 0 ? 'flex' : 'none';
+
+    filtered.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+    filtered.forEach(project => {
+        const card = document.createElement('div');
+        card.className = 'project-card';
+        card.dataset.type = project.type;
+        card.dataset.id = project.id;
+
+        const fileCount = Object.keys(project.files).length;
+        const date = project.updatedAt ? new Date(project.updatedAt).toLocaleDateString() : 'N/A';
+        const badgeClass = `badge-${project.type}`;
+        const typeLabel = project.type === '2d' ? '2D Game' :
+                         project.type === 'app' ? 'Web App' : 'WebGL 3D';
+
+        card.innerHTML = `
+            <div class="project-card-header">
+                <div class="project-card-title">${escapeHtml(project.name)}</div>
+                <span class="project-card-badge ${badgeClass}">${typeLabel}</span>
+            </div>
+            <div class="project-card-meta">
+                <span>📁 ${fileCount} files</span>
+                <span>📅 ${date}</span>
+            </div>
+            <div class="project-card-actions">
+                <button class="btn btn-sm card-rename" data-id="${project.id}">✏️ Rename</button>
+                <button class="btn btn-sm card-delete" data-id="${project.id}" style="color:var(--danger)">🗑️</button>
+            </div>
+        `;
+
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('.card-rename') || e.target.closest('.card-delete')) return;
+            openProject(project.id);
+        });
+
+        projectGrid.appendChild(card);
+    });
+
+    // Attach card action listeners
+    document.querySelectorAll('.card-rename').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const proj = projects.find(p => p.id === btn.dataset.id);
+            if (proj) {
+                showRenameModal('Rename Project', 'Project Name', proj.name, (newName) => {
+                    if (newName.trim()) {
+                        proj.name = newName.trim();
+                        proj.updatedAt = Date.now();
+                        saveProjects(projects);
+                        renderDashboard(searchInput.value);
+                        showToast('Project renamed', 'success');
+                    }
+                });
+            }
+        });
+    });
+
+    document.querySelectorAll('.card-delete').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (confirm('Delete this project? This cannot be undone.')) {
+                projects = projects.filter(p => p.id !== btn.dataset.id);
+                saveProjects(projects);
+                renderDashboard(searchInput.value);
+                showToast('Project deleted', 'error');
+            }
+        });
+    });
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// ==================== PROJECT CREATION ====================
+function showNewProjectModal() {
+    newProjectModal.classList.add('active');
+    projectNameInput.value = '';
+    projectNameInput.focus();
+    selectedType = '2d';
+    typeCards.forEach(c => c.classList.toggle('selected', c.dataset.type === '2d'));
+}
+
+function hideNewProjectModal() {
+    newProjectModal.classList.remove('active');
+}
+
+function createNewProject() {
+    const name = projectNameInput.value.trim() || 'Untitled Project';
+
+    const project = {
+        id: generateId(),
         name: name,
-        content: getFileTemplate(name)
+        type: selectedType,
+        files: getDefaultFiles(selectedType),
+        createdAt: Date.now(),
+        updatedAt: Date.now()
     };
-    
-    currentProject.files.push(file);
-    saveToStorage();
-    hideModal('addFileModal');
-    renderFiles();
-    openFile(name);
-    showToast('File "' + name + '" created!', 'success');
+
+    projects.push(project);
+    saveProjects(projects);
+    hideNewProjectModal();
+    renderDashboard();
+    showToast(`Project "${name}" created!`, 'success');
+    openProject(project.id);
 }
 
-function getFileTemplate(filename) {
-    var ext = filename.split('.').pop().toLowerCase();
-    if (ext === 'html') {
-        return '<!DOCTYPE html>\n<html>\n<head>\n    <title>New Page</title>\n</head>\n<body>\n    \n</body>\n</html>';
-    } else if (ext === 'css') {
-        return '/* Styles */\n';
-    } else if (ext === 'js') {
-        return '// JavaScript\n';
-    } else if (ext === 'json') {
-        return '{\n    \n}';
+// ==================== EDITOR ====================
+function openProject(projectId) {
+    currentProjectId = projectId;
+    const project = getCurrentProject();
+    if (!project) return;
+
+    openTabs = [];
+    currentFileId = null;
+
+    dashboard.classList.remove('active');
+    editorView.classList.add('active');
+
+    // Set header info
+    editorProjectName.textContent = project.name;
+    const typeLabel = project.type === '2d' ? '2D' : project.type === 'app' ? 'APP' : 'WebGL';
+    const typeClass = `badge-${project.type}`;
+    projectTypeBadge.textContent = typeLabel;
+    projectTypeBadge.className = `project-type-badge ${typeClass}`;
+
+    renderFileList();
+
+    // Open first file
+    const firstFile = Object.keys(project.files)[0];
+    if (firstFile) {
+        openFile(firstFile);
+    } else {
+        codeEditor.value = '';
+        updateLineNumbers();
     }
-    return '';
+}
+
+function backToDashboard() {
+    editorView.classList.remove('active');
+    dashboard.classList.add('active');
+    currentProjectId = null;
+    currentFileId = null;
+    openTabs = [];
+    closeWebGLPreview();
+    renderDashboard(searchInput.value);
+}
+
+function renderFileList() {
+    const project = getCurrentProject();
+    if (!project) return;
+
+    fileList.innerHTML = '';
+    const fileNames = Object.keys(project.files);
+
+    fileNames.forEach(fileName => {
+        const item = document.createElement('div');
+        item.className = `file-item ${fileName === currentFileId ? 'active' : ''}`;
+        item.dataset.file = fileName;
+
+        item.innerHTML = `
+            <span class="file-icon">${getFileIcon(fileName)}</span>
+            <span class="file-name">${escapeHtml(fileName)}</span>
+            <div class="file-actions">
+                <button class="file-action-btn rename-file" title="Rename">✏️</button>
+                <button class="file-action-btn delete file-delete-btn" title="Delete">🗑️</button>
+            </div>
+        `;
+
+        item.addEventListener('click', (e) => {
+            if (e.target.closest('.file-action-btn')) return;
+            openFile(fileName);
+        });
+
+        item.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            showContextMenu(e.clientX, e.clientY, fileName);
+        });
+
+        fileList.appendChild(item);
+    });
+
+    // Attach file action listeners
+    document.querySelectorAll('.rename-file').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const fileName = btn.closest('.file-item').dataset.file;
+            renameFile(fileName);
+        });
+    });
+
+    document.querySelectorAll('.file-delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const fileName = btn.closest('.file-item').dataset.file;
+            deleteFile(fileName);
+        });
+    });
 }
 
 function openFile(fileName) {
-    if (!currentProject) return;
-    
-    currentFile = null;
-    for (var i = 0; i < currentProject.files.length; i++) {
-        if (currentProject.files[i].name === fileName) {
-            currentFile = currentProject.files[i];
-            break;
-        }
-    }
-    
-    if (!currentFile) return;
-    
-    // Add to tabs
-    if (openTabs.indexOf(fileName) === -1) {
+    const project = getCurrentProject();
+    if (!project || !(fileName in project.files)) return;
+
+    // Save current file
+    saveCurrentFile();
+
+    currentFileId = fileName;
+
+    // Add to tabs if not already open
+    if (!openTabs.includes(fileName)) {
         openTabs.push(fileName);
     }
-    
-    var editor = document.getElementById('codeEditor');
-    if (editor) {
-        editor.value = currentFile.content;
-    }
-    
+
+    // Load content
+    codeEditor.value = project.files[fileName];
     updateLineNumbers();
     renderTabs();
-    renderFiles();
-    updateFileInfo();
+    renderFileList();
+    codeEditor.focus();
+}
+
+function saveCurrentFile() {
+    if (!currentFileId) return;
+    const project = getCurrentProject();
+    if (!project || !(currentFileId in project.files)) return;
+
+    project.files[currentFileId] = codeEditor.value;
+    project.updatedAt = Date.now();
+    autoSave();
+}
+
+function renderTabs() {
+    codeTabs.innerHTML = '';
+    const project = getCurrentProject();
+    if (!project) return;
+
+    // Remove tabs for deleted files
+    openTabs = openTabs.filter(f => f in project.files);
+
+    openTabs.forEach(fileName => {
+        const tab = document.createElement('div');
+        tab.className = `code-tab ${fileName === currentFileId ? 'active' : ''}`;
+        tab.innerHTML = `
+            <span class="code-tab-icon">${getFileIcon(fileName)}</span>
+            <span>${escapeHtml(fileName)}</span>
+            <button class="code-tab-close" data-file="${fileName}">&times;</button>
+        `;
+
+        tab.addEventListener('click', (e) => {
+            if (e.target.closest('.code-tab-close')) return;
+            openFile(fileName);
+        });
+
+        codeTabs.appendChild(tab);
+    });
+
+    // Close tab buttons
+    document.querySelectorAll('.code-tab-close').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeTab(btn.dataset.file);
+        });
+    });
 }
 
 function closeTab(fileName) {
-    var index = openTabs.indexOf(fileName);
-    if (index > -1) {
-        openTabs.splice(index, 1);
-    }
-    
-    if (currentFile && currentFile.name === fileName) {
+    const idx = openTabs.indexOf(fileName);
+    if (idx === -1) return;
+
+    openTabs.splice(idx, 1);
+
+    if (fileName === currentFileId) {
         if (openTabs.length > 0) {
-            openFile(openTabs[openTabs.length - 1]);
+            const newIdx = Math.min(idx, openTabs.length - 1);
+            openFile(openTabs[newIdx]);
         } else {
-            currentFile = null;
-            var editor = document.getElementById('codeEditor');
-            if (editor) editor.value = '';
+            currentFileId = null;
+            codeEditor.value = '';
+            updateLineNumbers();
         }
     }
-    
+
     renderTabs();
-}
-
-// Editor Methods
-function onEditorChange() {
-    var editor = document.getElementById('codeEditor');
-    if (currentFile && editor) {
-        currentFile.content = editor.value;
-        updateLineNumbers();
-        
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(function() {
-            saveToStorage();
-        }, 1000);
-    }
-}
-
-function handleEditorKeydown(e) {
-    var editor = document.getElementById('codeEditor');
-    if (!editor) return;
-    
-    if (e.key === 'Tab') {
-        e.preventDefault();
-        var start = editor.selectionStart;
-        var end = editor.selectionEnd;
-        editor.value = editor.value.substring(0, start) + '    ' + editor.value.substring(end);
-        editor.selectionStart = editor.selectionEnd = start + 4;
-        onEditorChange();
-    }
+    renderFileList();
 }
 
 function updateLineNumbers() {
-    var editor = document.getElementById('codeEditor');
-    var lineNumbers = document.getElementById('lineNumbers');
-    if (!editor || !lineNumbers) return;
-    
-    var lines = editor.value.split('\n').length;
-    var html = '';
-    for (var i = 1; i <= lines; i++) {
+    const lines = codeEditor.value.split('\n').length;
+    let html = '';
+    for (let i = 1; i <= lines; i++) {
         html += i + '\n';
     }
     lineNumbers.textContent = html;
 }
 
-function syncLineNumbers() {
-    var editor = document.getElementById('codeEditor');
-    var lineNumbers = document.getElementById('lineNumbers');
-    if (editor && lineNumbers) {
-        lineNumbers.scrollTop = editor.scrollTop;
-    }
+// ==================== FILE OPERATIONS ====================
+function addFile() {
+    addFileModal.classList.add('active');
+    newFileNameInput.value = '';
+    newFileNameInput.focus();
 }
 
-function updateCursorPosition() {
-    var editor = document.getElementById('codeEditor');
-    var cursorPos = document.getElementById('cursorPosition');
-    if (!editor || !cursorPos) return;
-    
-    var value = editor.value.substring(0, editor.selectionStart);
-    var lines = value.split('\n');
-    var line = lines.length;
-    var col = lines[lines.length - 1].length + 1;
-    
-    cursorPos.textContent = 'Ln ' + line + ', Col ' + col;
-}
+function confirmAddFile() {
+    const project = getCurrentProject();
+    if (!project) return;
 
-function updateFileInfo() {
-    var fileInfo = document.getElementById('currentFileInfo');
-    var fileType = document.getElementById('fileType');
-    
-    if (currentFile) {
-        var ext = currentFile.name.split('.').pop().toUpperCase();
-        if (fileType) fileType.textContent = ext;
-        if (fileInfo) fileInfo.textContent = currentFile.name;
-    } else {
-        if (fileType) fileType.textContent = '--';
-        if (fileInfo) fileInfo.textContent = '';
-    }
-}
-
-// Render Methods
-function renderProjects() {
-    var container = document.getElementById('projectsList');
-    if (!container) return;
-    
-    if (projects.length === 0) {
-        container.innerHTML = '<div class="empty-state">' +
-            '<div class="empty-state-icon">📁</div>' +
-            '<div class="empty-state-text">No projects yet.<br>Create your first project!</div>' +
-            '</div>';
+    let fileName = newFileNameInput.value.trim();
+    if (!fileName) {
+        showToast('Please enter a file name', 'error');
         return;
     }
-    
-    var icons = { '2d': '🎮', 'app': '📱', '3d': '🎲' };
-    var types = { '2d': '2D Game', 'app': 'Web App', '3d': 'WebGL 3D' };
-    
-    var html = '';
-    for (var i = 0; i < projects.length; i++) {
-        var project = projects[i];
-        var isActive = currentProject && currentProject.id === project.id;
-        html += '<div class="project-item ' + (isActive ? 'active' : '') + '" data-id="' + project.id + '">';
-        html += '<span class="project-icon">' + icons[project.type] + '</span>';
-        html += '<div class="project-info">';
-        html += '<div class="project-name">' + project.name + '</div>';
-        html += '<div class="project-type">' + types[project.type] + '</div>';
-        html += '</div></div>';
-    }
-    
-    container.innerHTML = html;
-    
-    // Bind click events
-    var items = container.querySelectorAll('.project-item');
-    items.forEach(function(item) {
-        item.onclick = function(e) {
-            var id = this.getAttribute('data-id');
-            selectProject(id);
-        };
-        item.oncontextmenu = function(e) {
-            e.preventDefault();
-            var id = this.getAttribute('data-id');
-            showContextMenu(e, 'project', id);
-        };
-    });
-}
 
-function renderFiles() {
-    var container = document.getElementById('filesList');
-    if (!container) return;
-    
-    if (!currentProject) {
-        container.innerHTML = '';
+    // Add default extension if none provided
+    if (!fileName.includes('.')) {
+        fileName += '.js';
+    }
+
+    if (fileName in project.files) {
+        showToast('A file with that name already exists', 'error');
         return;
     }
-    
-    var icons = {
-        'html': '📄',
-        'css': '🎨',
-        'js': '⚡',
-        'json': '📋'
-    };
-    
-    var html = '';
-    for (var i = 0; i < currentProject.files.length; i++) {
-        var file = currentProject.files[i];
-        var ext = file.name.split('.').pop().toLowerCase();
-        var icon = icons[ext] || '📝';
-        var isActive = currentFile && currentFile.name === file.name;
-        
-        html += '<div class="file-item ' + (isActive ? 'active' : '') + '" data-name="' + file.name + '">';
-        html += '<span class="file-icon">' + icon + '</span>';
-        html += '<span class="file-name">' + file.name + '</span>';
-        html += '</div>';
-    }
-    
-    container.innerHTML = html;
-    
-    var items = container.querySelectorAll('.file-item');
-    items.forEach(function(item) {
-        item.onclick = function() {
-            var name = this.getAttribute('data-name');
-            openFile(name);
-        };
-        item.oncontextmenu = function(e) {
-            e.preventDefault();
-            var name = this.getAttribute('data-name');
-            showContextMenu(e, 'file', name);
-        };
+
+    project.files[fileName] = '';
+    project.updatedAt = Date.now();
+    saveProjects(projects);
+    addFileModal.classList.remove('active');
+    renderFileList();
+    openFile(fileName);
+    showToast(`File "${fileName}" created`, 'success');
+}
+
+function renameFile(oldName) {
+    const project = getCurrentProject();
+    if (!project) return;
+
+    showRenameModal('Rename File', 'File Name', oldName, (newName) => {
+        newName = newName.trim();
+        if (!newName) return;
+        if (newName === oldName) return;
+        if (newName in project.files) {
+            showToast('A file with that name already exists', 'error');
+            return;
+        }
+
+        project.files[newName] = project.files[oldName];
+        delete project.files[oldName];
+        project.updatedAt = Date.now();
+        saveProjects(projects);
+
+        // Update tabs
+        const tabIdx = openTabs.indexOf(oldName);
+        if (tabIdx !== -1) openTabs[tabIdx] = newName;
+        if (currentFileId === oldName) currentFileId = newName;
+
+        renderFileList();
+        renderTabs();
+        showToast(`File renamed to "${newName}"`, 'success');
     });
 }
 
-function renderTabs() {
-    var container = document.getElementById('filesTabs');
-    if (!container) return;
-    
-    var icons = {
-        'html': '📄',
-        'css': '🎨',
-        'js': '⚡',
-        'json': '📋'
-    };
-    
-    var html = '';
-    for (var i = 0; i < openTabs.length; i++) {
-        var fileName = openTabs[i];
-        var ext = fileName.split('.').pop().toLowerCase();
-        var icon = icons[ext] || '📝';
-        var isActive = currentFile && currentFile.name === fileName;
-        
-        html += '<div class="file-tab ' + (isActive ? 'active' : '') + '" data-name="' + fileName + '">';
-        html += '<span>' + icon + '</span>';
-        html += '<span>' + fileName + '</span>';
-        html += '<span class="tab-close" data-close="' + fileName + '">&times;</span>';
-        html += '</div>';
+function deleteFile(fileName) {
+    const project = getCurrentProject();
+    if (!project) return;
+
+    const fileCount = Object.keys(project.files).length;
+    if (fileCount <= 1) {
+        showToast('Cannot delete the last file', 'error');
+        return;
     }
-    
-    container.innerHTML = html;
-    
-    var tabs = container.querySelectorAll('.file-tab');
-    tabs.forEach(function(tab) {
-        tab.onclick = function(e) {
-            if (!e.target.classList.contains('tab-close')) {
-                var name = this.getAttribute('data-name');
-                openFile(name);
-            }
-        };
-    });
-    
-    var closeBtns = container.querySelectorAll('.tab-close');
-    closeBtns.forEach(function(btn) {
-        btn.onclick = function(e) {
-            e.stopPropagation();
-            var name = this.getAttribute('data-close');
-            closeTab(name);
-        };
-    });
+
+    if (!confirm(`Delete "${fileName}"?`)) return;
+
+    delete project.files[fileName];
+    project.updatedAt = Date.now();
+    saveProjects(projects);
+
+    closeTab(fileName);
+    renderFileList();
+    renderTabs();
+
+    if (currentFileId === fileName || !currentFileId) {
+        const firstFile = Object.keys(project.files)[0];
+        if (firstFile) openFile(firstFile);
+    }
+
+    showToast(`File "${fileName}" deleted`, 'info');
 }
 
-// Context Menu
-function showContextMenu(event, type, target) {
-    event.preventDefault();
-    event.stopPropagation();
-    
-    contextType = type;
-    contextTarget = target;
-    
-    var menu = document.getElementById('contextMenu');
-    if (menu) {
-        menu.style.left = event.pageX + 'px';
-        menu.style.top = event.pageY + 'px';
-        menu.classList.add('active');
+function duplicateFile(fileName) {
+    const project = getCurrentProject();
+    if (!project) return;
+
+    const ext = fileName.includes('.') ? '.' + fileName.split('.').pop() : '';
+    const base = fileName.includes('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
+    let newName = `${base}_copy${ext}`;
+    let counter = 1;
+    while (newName in project.files) {
+        counter++;
+        newName = `${base}_copy${counter}${ext}`;
+    }
+
+    project.files[newName] = project.files[fileName];
+    project.updatedAt = Date.now();
+    saveProjects(projects);
+    renderFileList();
+    openFile(newName);
+    showToast(`File duplicated as "${newName}"`, 'success');
+}
+
+// ==================== RENAME MODAL ====================
+function showRenameModal(title, label, currentValue, callback) {
+    renameModalTitle.textContent = title;
+    renameLabel.textContent = label;
+    renameInput.value = currentValue;
+    renameCallback = callback;
+    renameModal.classList.add('active');
+    renameInput.focus();
+    renameInput.select();
+}
+
+function confirmRename() {
+    if (renameCallback) {
+        renameCallback(renameInput.value);
+    }
+    renameModal.classList.remove('active');
+    renameCallback = null;
+}
+
+// ==================== CONTEXT MENU ====================
+function showContextMenu(x, y, fileName) {
+    contextTarget = fileName;
+    contextMenu.style.left = x + 'px';
+    contextMenu.style.top = y + 'px';
+    contextMenu.classList.add('active');
+
+    // Adjust position if off-screen
+    const rect = contextMenu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+        contextMenu.style.left = (x - rect.width) + 'px';
+    }
+    if (rect.bottom > window.innerHeight) {
+        contextMenu.style.top = (y - rect.height) + 'px';
     }
 }
 
 function hideContextMenu() {
-    var menu = document.getElementById('contextMenu');
-    if (menu) {
-        menu.classList.remove('active');
-    }
+    contextMenu.classList.remove('active');
+    contextTarget = null;
 }
 
-function handleContextAction(action) {
-    hideContextMenu();
-    
-    if (action === 'rename') {
-        showRenameModal();
-    } else if (action === 'duplicate') {
-        duplicateItem();
-    } else if (action === 'delete') {
-        deleteItem();
-    }
-}
-
-function showRenameModal() {
-    var title = document.getElementById('renameTitle');
-    var input = document.getElementById('renameInput');
-    
-    if (contextType === 'project') {
-        var project = null;
-        for (var i = 0; i < projects.length; i++) {
-            if (projects[i].id === contextTarget) {
-                project = projects[i];
-                break;
-            }
-        }
-        if (title) title.textContent = '✏️ Rename Project';
-        if (input) input.value = project ? project.name : '';
-    } else {
-        if (title) title.textContent = '✏️ Rename File';
-        if (input) input.value = contextTarget || '';
-    }
-    
-    showModal('renameModal');
-}
-
-function confirmRename() {
-    var input = document.getElementById('renameInput');
-    if (!input) return;
-    
-    var newName = input.value.trim();
-    
-    if (!newName) {
-        showToast('Please enter a name', 'error');
-        return;
-    }
-    
-    if (contextType === 'project') {
-        for (var i = 0; i < projects.length; i++) {
-            if (projects[i].id === contextTarget) {
-                projects[i].name = newName;
-                break;
-            }
-        }
-        saveToStorage();
-        renderProjects();
-        showToast('Project renamed!', 'success');
-    } else {
-        if (currentProject) {
-            for (var j = 0; j < currentProject.files.length; j++) {
-                if (currentProject.files[j].name === contextTarget) {
-                    var oldName = currentProject.files[j].name;
-                    currentProject.files[j].name = newName;
-                    
-                    var tabIndex = openTabs.indexOf(oldName);
-                    if (tabIndex > -1) {
-                        openTabs[tabIndex] = newName;
-                    }
-                    
-                    if (currentFile && currentFile.name === oldName) {
-                        currentFile = currentProject.files[j];
-                    }
-                    break;
-                }
-            }
-            saveToStorage();
-            renderFiles();
-            renderTabs();
-            updateFileInfo();
-            showToast('File renamed!', 'success');
-        }
-    }
-    
-    hideModal('renameModal');
-}
-
-function duplicateItem() {
-    if (contextType === 'project') {
-        for (var i = 0; i < projects.length; i++) {
-            if (projects[i].id === contextTarget) {
-                var newProject = JSON.parse(JSON.stringify(projects[i]));
-                newProject.id = Date.now().toString();
-                newProject.name = projects[i].name + ' (Copy)';
-                newProject.createdAt = new Date().toISOString();
-                projects.push(newProject);
-                break;
-            }
-        }
-        saveToStorage();
-        renderProjects();
-        showToast('Project duplicated!', 'success');
-    } else {
-        if (currentProject) {
-            for (var j = 0; j < currentProject.files.length; j++) {
-                if (currentProject.files[j].name === contextTarget) {
-                    var file = currentProject.files[j];
-                    var ext = file.name.indexOf('.') > -1 ? '.' + file.name.split('.').pop() : '';
-                    var baseName = file.name.replace(ext, '');
-                    var newFile = {
-                        name: baseName + '_copy' + ext,
-                        content: file.content
-                    };
-                    currentProject.files.push(newFile);
-                    break;
-                }
-            }
-            saveToStorage();
-            renderFiles();
-            showToast('File duplicated!', 'success');
-        }
-    }
-}
-
-function deleteItem() {
-    if (contextType === 'project') {
-        for (var i = 0; i < projects.length; i++) {
-            if (projects[i].id === contextTarget) {
-                var name = projects[i].name;
-                projects.splice(i, 1);
-                
-                if (currentProject && currentProject.id === contextTarget) {
-                    currentProject = null;
-                    currentFile = null;
-                    openTabs = [];
-                    var editor = document.getElementById('codeEditor');
-                    if (editor) editor.value = '';
-                    var filesSection = document.getElementById('filesSection');
-                    if (filesSection) filesSection.style.display = 'none';
-                }
-                
-                saveToStorage();
-                renderProjects();
-                renderTabs();
-                showToast('Project "' + name + '" deleted', 'info');
-                break;
-            }
-        }
-    } else {
-        if (currentProject) {
-            for (var j = 0; j < currentProject.files.length; j++) {
-                if (currentProject.files[j].name === contextTarget) {
-                    var fileName = currentProject.files[j].name;
-                    currentProject.files.splice(j, 1);
-                    closeTab(contextTarget);
-                    saveToStorage();
-                    renderFiles();
-                    showToast('File "' + fileName + '" deleted', 'info');
-                    break;
-                }
-            }
-        }
-    }
-}
-
-// Run Project
+// ==================== RUN PROJECT ====================
 function runProject() {
-    if (!currentProject) {
-        showToast('Please select a project first', 'error');
-        return;
-    }
-    
-    var htmlFile = null;
-    for (var i = 0; i < currentProject.files.length; i++) {
-        if (currentProject.files[i].name.endsWith('.html')) {
-            htmlFile = currentProject.files[i];
-            break;
-        }
-    }
-    
-    if (!htmlFile) {
-        showToast('No HTML file found in project', 'error');
-        return;
-    }
-    
-    var html = htmlFile.content;
-    
-    // Inject CSS
-    for (var j = 0; j < currentProject.files.length; j++) {
-        var file = currentProject.files[j];
-        if (file.name.endsWith('.css')) {
-            var cssRegex = new RegExp('<link[^>]*href=["\']' + file.name.replace('.', '\\.') + '["\'][^>]*>', 'gi');
-            html = html.replace(cssRegex, '<style>\n' + file.content + '\n</style>');
-        }
-    }
-    
-    // Inject JS
-    for (var k = 0; k < currentProject.files.length; k++) {
-        var jsFile = currentProject.files[k];
-        if (jsFile.name.endsWith('.js')) {
-            var jsRegex = new RegExp('<script[^>]*src=["\']' + jsFile.name.replace('.', '\\.') + '["\'][^>]*></script>', 'gi');
-            html = html.replace(jsRegex, '<script>\n' + jsFile.content + '\n<\/script>');
-        }
-    }
-    
-    var blob = new Blob([html], { type: 'text/html' });
-    var url = URL.createObjectURL(blob);
-    
-    if (currentProject.type === '3d') {
-        var width = 900;
-        var height = 700;
-        var left = (screen.width - width) / 2;
-        var top = (screen.height - height) / 2;
-        
-        var popup = window.open(
-            url,
-            'WebGL_Preview_' + Date.now(),
-            'width=' + width + ',height=' + height + ',left=' + left + ',top=' + top + ',menubar=no,toolbar=no,location=no,status=no'
-        );
-        
-        if (popup) {
-            popup.focus();
-            showToast('WebGL preview opened in popup', 'success');
-        } else {
-            showToast('Popup blocked! Please allow popups.', 'error');
-        }
+    const project = getCurrentProject();
+    if (!project) return;
+
+    saveCurrentFile();
+    saveProjects(projects);
+
+    if (project.type === 'webgl') {
+        runWebGL(project);
     } else {
-        var newTab = window.open(url, '_blank');
-        if (newTab) {
-            newTab.focus();
-            showToast('Project opened in new tab', 'success');
-        } else {
-            showToast('Popup blocked! Please allow popups.', 'error');
-        }
+        runInNewTab(project);
     }
-    
-    setTimeout(function() {
-        URL.revokeObjectURL(url);
-    }, 2000);
 }
 
-// Toast Notifications
-function showToast(message, type) {
-    type = type || 'info';
-    var container = document.getElementById('toastContainer');
-    if (!container) {
-        console.log("Toast: " + message);
-        return;
-    }
-    
-    var icons = {
-        success: '✓',
-        error: '✕',
-        info: 'ℹ'
-    };
-    
-    var toast = document.createElement('div');
-    toast.className = 'toast toast-' + type;
-    toast.innerHTML = '<span class="toast-icon">' + icons[type] + '</span>' +
-        '<span class="toast-message">' + message + '</span>';
-    
-    container.appendChild(toast);
-    
-    setTimeout(function() {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(100%)';
-        setTimeout(function() {
-            if (toast.parentNode) {
-                toast.parentNode.removeChild(toast);
-            }
-        }, 300);
-    }, 3000);
+function runInNewTab(project) {
+    const htmlContent = buildProjectHTML(project);
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    // Revoke after a delay to allow loading
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    showToast('Project launched in new tab', 'success');
 }
+
+function runWebGL(project) {
+    const htmlContent = buildProjectHTML(project);
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+
+    webglFrame.src = url;
+    webglPreview.classList.add('active');
+    showToast('WebGL preview opened', 'success');
+
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+function buildProjectHTML(project) {
+    // Find the main HTML file
+    let htmlFile = null;
+    let htmlContent = '';
+
+    const htmlFiles = Object.keys(project.files).filter(f =>
+        f.endsWith('.html') || f.endsWith('.htm')
+    );
+
+    if (htmlFiles.includes('index.html')) {
+        htmlFile = 'index.html';
+    } else if (htmlFiles.length > 0) {
+        htmlFile = htmlFiles[0];
+    }
+
+    if (htmlFile) {
+        htmlContent = project.files[htmlFile];
+    } else {
+        // No HTML file, create a basic one
+        htmlContent = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body></body></html>';
+    }
+
+    // Inline CSS files
+    const cssFiles = Object.keys(project.files).filter(f => f.endsWith('.css'));
+    cssFiles.forEach(cssFile => {
+        const cssContent = project.files[cssFile];
+        // Replace link tag references
+        const linkRegex = new RegExp(`<link[^>]*href=["']${escapeRegExp(cssFile)}["'][^>]*/?>`, 'gi');
+        if (linkRegex.test(htmlContent)) {
+            htmlContent = htmlContent.replace(linkRegex, `<style>\n${cssContent}\n</style>`);
+        } else {
+            // Inject before </head>
+            htmlContent = htmlContent.replace('</head>', `<style>\n${cssContent}\n</style>\n</head>`);
+        }
+    });
+
+    // Inline JS files
+    const jsFiles = Object.keys(project.files).filter(f => f.endsWith('.js'));
+    jsFiles.forEach(jsFile => {
+        const jsContent = project.files[jsFile];
+        // Replace script tag references
+        const scriptRegex = new RegExp(`<script[^>]*src=["']${escapeRegExp(jsFile)}["'][^>]*>[\\s\\S]*?<\\/script>`, 'gi');
+        if (scriptRegex.test(htmlContent)) {
+            htmlContent = htmlContent.replace(scriptRegex, `<script>\n${jsContent}\n<\/script>`);
+        } else {
+            // Inject before </body>
+            htmlContent = htmlContent.replace('</body>', `<script>\n${jsContent}\n<\/script>\n</body>`);
+        }
+    });
+
+    return htmlContent;
+}
+
+function escapeRegExp(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function closeWebGLPreview() {
+    webglPreview.classList.remove('active');
+    webglFrame.src = 'about:blank';
+}
+
+// ==================== WEBGL PREVIEW DRAG & RESIZE ====================
+let isDragging = false;
+let isResizing = false;
+let dragOffsetX, dragOffsetY;
+
+const webglHeader = document.querySelector('.webgl-preview-header');
+const webglResizeHandle = $('webglResizeHandle');
+
+webglHeader.addEventListener('mousedown', (e) => {
+    if (e.target.closest('button')) return;
+    isDragging = true;
+    const rect = webglPreview.getBoundingClientRect();
+    dragOffsetX = e.clientX - rect.left;
+    dragOffsetY = e.clientY - rect.top;
+    e.preventDefault();
+});
+
+webglResizeHandle.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    e.preventDefault();
+    e.stopPropagation();
+});
+
+document.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+        webglPreview.style.left = (e.clientX - dragOffsetX) + 'px';
+        webglPreview.style.top = (e.clientY - dragOffsetY) + 'px';
+        webglPreview.style.right = 'auto';
+    }
+    if (isResizing) {
+        const rect = webglPreview.getBoundingClientRect();
+        const newWidth = Math.max(320, e.clientX - rect.left);
+        const newHeight = Math.max(240, e.clientY - rect.top);
+        webglPreview.style.width = newWidth + 'px';
+        webglPreview.style.height = newHeight + 'px';
+    }
+});
+
+document.addEventListener('mouseup', () => {
+    isDragging = false;
+    isResizing = false;
+});
+
+// ==================== TAB KEY SUPPORT ====================
+codeEditor.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = codeEditor.selectionStart;
+        const end = codeEditor.selectionEnd;
+
+        if (e.shiftKey) {
+            // Unindent
+            const before = codeEditor.value.substring(0, start);
+            const lastNewline = before.lastIndexOf('\n');
+            const lineStart = lastNewline + 1;
+            const lineContent = codeEditor.value.substring(lineStart);
+            if (lineContent.startsWith('    ')) {
+                codeEditor.value = codeEditor.value.substring(0, lineStart) + lineContent.substring(4);
+                codeEditor.selectionStart = codeEditor.selectionEnd = Math.max(lineStart, start - 4);
+            } else if (lineContent.startsWith('\t')) {
+                codeEditor.value = codeEditor.value.substring(0, lineStart) + lineContent.substring(1);
+                codeEditor.selectionStart = codeEditor.selectionEnd = Math.max(lineStart, start - 1);
+            }
+        } else {
+            codeEditor.value = codeEditor.value.substring(0, start) + '    ' + codeEditor.value.substring(end);
+            codeEditor.selectionStart = codeEditor.selectionEnd = start + 4;
+        }
+
+        updateLineNumbers();
+        saveCurrentFile();
+    }
+
+    // Auto-close brackets
+    const pairs = { '(': ')', '{': '}', '[': ']', '"': '"', "'": "'", '`': '`' };
+    if (pairs[e.key]) {
+        const start = codeEditor.selectionStart;
+        const end = codeEditor.selectionEnd;
+        if (start !== end) {
+            // Wrap selection
+            e.preventDefault();
+            const selected = codeEditor.value.substring(start, end);
+            codeEditor.value = codeEditor.value.substring(0, start) + e.key + selected + pairs[e.key] + codeEditor.value.substring(end);
+            codeEditor.selectionStart = start + 1;
+            codeEditor.selectionEnd = end + 1;
+            updateLineNumbers();
+            saveCurrentFile();
+        }
+    }
+
+    // Enter - auto indent
+    if (e.key === 'Enter') {
+        const start = codeEditor.selectionStart;
+        const before = codeEditor.value.substring(0, start);
+        const currentLine = before.split('\n').pop();
+        const indent = currentLine.match(/^\s*/)[0];
+        const lastChar = before.trim().slice(-1);
+        let extra = '';
+        if (lastChar === '{' || lastChar === '(' || lastChar === '[') {
+            extra = '    ';
+        }
+        e.preventDefault();
+        const insertion = '\n' + indent + extra;
+        codeEditor.value = codeEditor.value.substring(0, start) + insertion + codeEditor.value.substring(codeEditor.selectionEnd);
+        codeEditor.selectionStart = codeEditor.selectionEnd = start + insertion.length;
+        updateLineNumbers();
+        saveCurrentFile();
+    }
+
+    // Ctrl+S
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveCurrentFile();
+        saveProjects(projects);
+        showToast('Saved!', 'success');
+    }
+});
+
+// ==================== EVENT LISTENERS ====================
+
+// Dashboard
+$('newProjectBtn').addEventListener('click', showNewProjectModal);
+searchInput.addEventListener('input', () => renderDashboard(searchInput.value));
+
+// New Project Modal
+$('closeModal').addEventListener('click', hideNewProjectModal);
+$('cancelProject').addEventListener('click', hideNewProjectModal);
+$('createProject').addEventListener('click', createNewProject);
+projectNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') createNewProject();
+});
+
+typeCards.forEach(card => {
+    card.addEventListener('click', () => {
+        typeCards.forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedType = card.dataset.type;
+    });
+});
+
+// Editor
+$('backToDash').addEventListener('click', () => {
+    saveCurrentFile();
+    saveProjects(projects);
+    backToDashboard();
+});
+
+editorProjectName.addEventListener('click', () => {
+    const project = getCurrentProject();
+    if (!project) return;
+    showRenameModal('Rename Project', 'Project Name', project.name, (newName) => {
+        if (newName.trim()) {
+            project.name = newName.trim();
+            project.updatedAt = Date.now();
+            saveProjects(projects);
+            editorProjectName.textContent = project.name;
+            showToast('Project renamed', 'success');
+        }
+    });
+});
+
+$('runProject').addEventListener('click', runProject);
+
+$('deleteProject').addEventListener('click', () => {
+    if (confirm('Delete this entire project? This cannot be undone.')) {
+        projects = projects.filter(p => p.id !== currentProjectId);
+        saveProjects(projects);
+        showToast('Project deleted', 'error');
+        backToDashboard();
+    }
+});
+
+$('addFileBtn').addEventListener('click', addFile);
+
+// Add File Modal
+$('closeAddFileModal').addEventListener('click', () => addFileModal.classList.remove('active'));
+$('cancelAddFile').addEventListener('click', () => addFileModal.classList.remove('active'));
+$('confirmAddFile').addEventListener('click', confirmAddFile);
+newFileNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') confirmAddFile();
+});
+
+// Rename Modal
+$('closeRenameModal').addEventListener('click', () => renameModal.classList.remove('active'));
+$('cancelRename').addEventListener('click', () => renameModal.classList.remove('active'));
+$('confirmRename').addEventListener('click', confirmRename);
+renameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') confirmRename();
+});
+
+// Code Editor
+codeEditor.addEventListener('input', () => {
+    updateLineNumbers();
+    saveCurrentFile();
+});
+
+codeEditor.addEventListener('scroll', () => {
+    lineNumbers.scrollTop = codeEditor.scrollTop;
+});
+
+// WebGL Preview
+$('webglClose').addEventListener('click', closeWebGLPreview);
+$('webglReload').addEventListener('click', () => {
+    saveCurrentFile();
+    saveProjects(projects);
+    const project = getCurrentProject();
+    if (project) runWebGL(project);
+});
+
+// Context Menu
+document.addEventListener('click', () => hideContextMenu());
+document.querySelectorAll('.context-item').forEach(item => {
+    item.addEventListener('click', () => {
+        const action = item.dataset.action;
+        if (!contextTarget) return;
+        switch (action) {
+            case 'rename':
+                renameFile(contextTarget);
+                break;
+            case 'duplicate':
+                duplicateFile(contextTarget);
+                break;
+            case 'delete':
+                deleteFile(contextTarget);
+                break;
+        }
+        hideContextMenu();
+    });
+});
+
+// Close modals on overlay click
+[newProjectModal, renameModal, addFileModal].forEach(modal => {
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.remove('active');
+        }
+    });
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        newProjectModal.classList.remove('active');
+        renameModal.classList.remove('active');
+        addFileModal.classList.remove('active');
+        hideContextMenu();
+    }
+});
+
+// Auto-save on page unload
+window.addEventListener('beforeunload', () => {
+    saveCurrentFile();
+    saveProjects(projects);
+});
+
+// ==================== INIT ====================
+renderDashboard();

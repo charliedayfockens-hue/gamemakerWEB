@@ -3,214 +3,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebGL Game Editor</title>
+    <title>GameForge Editor</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- PROJECT DASHBOARD -->
+
+    <!-- ============ DASHBOARD ============ -->
     <div id="dashboard" class="view active">
         <header class="dash-header">
             <div class="logo">
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                    <rect width="32" height="32" rx="8" fill="#6C5CE7"/>
-                    <path d="M8 12L16 7L24 12V20L16 25L8 20V12Z" stroke="white" stroke-width="2" fill="none"/>
-                    <circle cx="16" cy="16" r="3" fill="white"/>
-                </svg>
-                <h1>GameForge Editor</h1>
+                <div class="logo-icon">GF</div>
+                <h1>GameForge</h1>
             </div>
-            <button class="btn btn-primary" id="newProjectBtn">
-                <span class="icon">+</span> New Project
-            </button>
+            <button class="btn btn-primary" id="newProjectBtn">+ New Project</button>
         </header>
-        <div class="dash-content">
-            <div class="search-bar">
-                <input type="text" id="searchProjects" placeholder="Search projects...">
-            </div>
+        <div class="dash-body">
+            <input type="text" id="searchProjects" class="search-input" placeholder="🔍  Search projects...">
             <div id="projectGrid" class="project-grid"></div>
             <div id="emptyState" class="empty-state">
-                <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-                    <rect x="10" y="20" width="60" height="45" rx="4" stroke="#555" stroke-width="2" fill="none"/>
-                    <path d="M10 30H70" stroke="#555" stroke-width="2"/>
-                    <circle cx="18" cy="25" r="2" fill="#e74c3c"/>
-                    <circle cx="25" cy="25" r="2" fill="#f39c12"/>
-                    <circle cx="32" cy="25" r="2" fill="#2ecc71"/>
-                </svg>
+                <div class="empty-icon">📂</div>
                 <h2>No Projects Yet</h2>
-                <p>Create your first project to get started</p>
+                <p>Click <strong>"+ New Project"</strong> to get started.</p>
             </div>
         </div>
     </div>
 
-    <!-- NEW PROJECT MODAL -->
-    <div id="newProjectModal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Create New Project</h2>
-                <button class="modal-close" id="closeModal">&times;</button>
+    <!-- ============ EDITOR ============ -->
+    <div id="editor" class="view">
+        <div class="editor-topbar">
+            <div class="topbar-left">
+                <button class="btn btn-ghost" id="backToDash">← Back</button>
+                <span id="projectTypeBadge" class="badge">2D</span>
+                <span id="editorProjectName" class="project-title" title="Click to rename project">Untitled</span>
             </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Project Name</label>
-                    <input type="text" id="projectName" placeholder="My Awesome Game" maxlength="50">
+            <div class="topbar-right">
+                <button class="btn btn-run" id="runProject">▶ Run</button>
+                <button class="btn btn-delete" id="deleteProject">🗑 Delete Project</button>
+            </div>
+        </div>
+        <div class="editor-main">
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <span>FILES</span>
+                    <button class="btn-add-file" id="addFileBtn" title="Add new file">+</button>
                 </div>
-                <div class="form-group">
-                    <label>Project Type</label>
-                    <div class="type-selector">
-                        <div class="type-card selected" data-type="2d">
-                            <div class="type-icon">
-                                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                                    <rect x="6" y="10" width="36" height="28" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>
-                                    <rect x="12" y="22" width="8" height="12" fill="currentColor" opacity="0.3"/>
-                                    <rect x="24" y="18" width="8" height="16" fill="currentColor" opacity="0.3"/>
-                                    <circle cx="16" cy="16" r="3" fill="currentColor" opacity="0.5"/>
-                                </svg>
-                            </div>
-                            <h3>2D Game</h3>
-                            <p>Canvas-based 2D game with sprite support</p>
-                        </div>
-                        <div class="type-card" data-type="app">
-                            <div class="type-icon">
-                                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                                    <rect x="8" y="6" width="32" height="36" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>
-                                    <path d="M8 14H40" stroke="currentColor" stroke-width="2"/>
-                                    <rect x="12" y="18" width="24" height="4" rx="1" fill="currentColor" opacity="0.2"/>
-                                    <rect x="12" y="26" width="16" height="4" rx="1" fill="currentColor" opacity="0.2"/>
-                                    <rect x="12" y="34" width="20" height="4" rx="1" fill="currentColor" opacity="0.2"/>
-                                </svg>
-                            </div>
-                            <h3>Web App</h3>
-                            <p>Standard web application with HTML/CSS/JS</p>
-                        </div>
-                        <div class="type-card" data-type="webgl">
-                            <div class="type-icon">
-                                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                                    <path d="M24 6L42 16V32L24 42L6 32V16L24 6Z" stroke="currentColor" stroke-width="2" fill="none"/>
-                                    <path d="M24 6V42" stroke="currentColor" stroke-width="1" opacity="0.5"/>
-                                    <path d="M6 16L42 32" stroke="currentColor" stroke-width="1" opacity="0.5"/>
-                                    <path d="M42 16L6 32" stroke="currentColor" stroke-width="1" opacity="0.5"/>
-                                </svg>
-                            </div>
-                            <h3>WebGL 3D</h3>
-                            <p>3D game with WebGL rendering pipeline</p>
-                        </div>
+                <div id="fileList" class="file-list"></div>
+            </aside>
+            <div class="editor-area">
+                <div id="codeTabs" class="tab-bar"></div>
+                <div class="code-container">
+                    <div id="lineNumbers" class="line-numbers"></div>
+                    <textarea id="codeEditor" class="code-textarea" spellcheck="false"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ NEW PROJECT MODAL ============ -->
+    <div id="newProjectModal" class="overlay">
+        <div class="modal">
+            <div class="modal-top">
+                <h2>New Project</h2>
+                <button class="btn-close" id="closeModal">×</button>
+            </div>
+            <div class="modal-content">
+                <label class="field-label">Project Name</label>
+                <input type="text" id="projectName" class="field-input" placeholder="My Awesome Game" maxlength="50">
+                <label class="field-label" style="margin-top:20px;">Project Type</label>
+                <div class="type-picker">
+                    <div class="type-option selected" data-type="2d">
+                        <div class="type-emoji">🎮</div>
+                        <strong>2D Game</strong>
+                        <small>Canvas-based 2D game</small>
+                    </div>
+                    <div class="type-option" data-type="app">
+                        <div class="type-emoji">🌐</div>
+                        <strong>Web App</strong>
+                        <small>Standard HTML/CSS/JS</small>
+                    </div>
+                    <div class="type-option" data-type="webgl">
+                        <div class="type-emoji">🧊</div>
+                        <strong>WebGL 3D</strong>
+                        <small>3D WebGL rendering</small>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="cancelProject">Cancel</button>
-                <button class="btn btn-primary" id="createProject">Create Project</button>
+            <div class="modal-bottom">
+                <button class="btn btn-cancel" id="cancelProject">Cancel</button>
+                <button class="btn btn-primary" id="createProject">Create</button>
             </div>
         </div>
     </div>
 
-    <!-- EDITOR VIEW -->
-    <div id="editor" class="view">
-        <div class="editor-header">
-            <div class="editor-header-left">
-                <button class="btn btn-icon" id="backToDash" title="Back to Dashboard">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                        <path d="M12 4L6 10L12 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                </button>
-                <span class="project-type-badge" id="projectTypeBadge"></span>
-                <h2 id="editorProjectName" class="editable-title" title="Click to rename"></h2>
-            </div>
-            <div class="editor-header-right">
-                <button class="btn btn-success" id="runProject">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M4 2L14 8L4 14V2Z" fill="currentColor"/>
-                    </svg>
-                    Run
-                </button>
-                <button class="btn btn-danger" id="deleteProject">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M2 4H14M5 4V2H11V4M6 7V12M10 7V12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                    </svg>
-                    Delete
-                </button>
-            </div>
-        </div>
-        <div class="editor-body">
-            <div class="file-panel">
-                <div class="file-panel-header">
-                    <span>Files</span>
-                    <button class="btn btn-sm" id="addFileBtn" title="Add File">+</button>
-                </div>
-                <div id="fileList" class="file-list"></div>
-            </div>
-            <div class="code-panel">
-                <div class="code-tabs" id="codeTabs"></div>
-                <div class="code-editor-wrapper">
-                    <div class="line-numbers" id="lineNumbers"></div>
-                    <textarea id="codeEditor" class="code-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- RENAME MODAL -->
-    <div id="renameModal" class="modal-overlay">
-        <div class="modal modal-sm">
-            <div class="modal-header">
+    <!-- ============ RENAME MODAL ============ -->
+    <div id="renameModal" class="overlay">
+        <div class="modal modal-small">
+            <div class="modal-top">
                 <h2 id="renameModalTitle">Rename</h2>
-                <button class="modal-close" id="closeRenameModal">&times;</button>
+                <button class="btn-close" id="closeRenameModal">×</button>
             </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label id="renameLabel">New Name</label>
-                    <input type="text" id="renameInput" placeholder="Enter new name" maxlength="50">
-                </div>
+            <div class="modal-content">
+                <label class="field-label" id="renameLabel">New Name</label>
+                <input type="text" id="renameInput" class="field-input" maxlength="50">
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="cancelRename">Cancel</button>
+            <div class="modal-bottom">
+                <button class="btn btn-cancel" id="cancelRename">Cancel</button>
                 <button class="btn btn-primary" id="confirmRename">Rename</button>
             </div>
         </div>
     </div>
 
-    <!-- ADD FILE MODAL -->
-    <div id="addFileModal" class="modal-overlay">
-        <div class="modal modal-sm">
-            <div class="modal-header">
-                <h2>Add New File</h2>
-                <button class="modal-close" id="closeAddFileModal">&times;</button>
+    <!-- ============ ADD FILE MODAL ============ -->
+    <div id="addFileModal" class="overlay">
+        <div class="modal modal-small">
+            <div class="modal-top">
+                <h2>Add File</h2>
+                <button class="btn-close" id="closeAddFileModal">×</button>
             </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>File Name (include extension)</label>
-                    <input type="text" id="newFileName" placeholder="e.g. utils.js, style2.css">
-                </div>
+            <div class="modal-content">
+                <label class="field-label">File name (with extension)</label>
+                <input type="text" id="newFileName" class="field-input" placeholder="utils.js">
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="cancelAddFile">Cancel</button>
-                <button class="btn btn-primary" id="confirmAddFile">Add File</button>
+            <div class="modal-bottom">
+                <button class="btn btn-cancel" id="cancelAddFile">Cancel</button>
+                <button class="btn btn-primary" id="confirmAddFile">Add</button>
             </div>
         </div>
     </div>
 
-    <!-- WEBGL PREVIEW WINDOW -->
-    <div id="webglPreview" class="webgl-preview">
-        <div class="webgl-preview-header">
+    <!-- ============ WEBGL PREVIEW ============ -->
+    <div id="webglPreview" class="webgl-window">
+        <div class="webgl-titlebar" id="webglTitlebar">
             <span>WebGL Preview</span>
-            <div class="webgl-preview-controls">
-                <button class="btn btn-sm" id="webglReload" title="Reload">⟳</button>
-                <button class="btn btn-sm btn-danger" id="webglClose" title="Close">&times;</button>
+            <div class="webgl-btns">
+                <button class="wgl-btn" id="webglReload" title="Reload">↻</button>
+                <button class="wgl-btn wgl-btn-close" id="webglClose" title="Close">×</button>
             </div>
         </div>
-        <iframe id="webglFrame" class="webgl-frame"></iframe>
-        <div class="webgl-resize-handle" id="webglResizeHandle"></div>
+        <iframe id="webglFrame" class="webgl-iframe"></iframe>
+        <div class="webgl-resize" id="webglResizeHandle"></div>
     </div>
 
-    <!-- CONTEXT MENU -->
-    <div id="contextMenu" class="context-menu">
-        <div class="context-item" data-action="rename">✏️ Rename</div>
-        <div class="context-item" data-action="duplicate">📋 Duplicate</div>
-        <div class="context-item context-danger" data-action="delete">🗑️ Delete</div>
+    <!-- ============ RIGHT-CLICK MENU ============ -->
+    <div id="contextMenu" class="ctx-menu">
+        <div class="ctx-item" data-action="rename">✏️ Rename</div>
+        <div class="ctx-item" data-action="duplicate">📋 Duplicate</div>
+        <div class="ctx-item ctx-danger" data-action="delete">🗑️ Delete</div>
     </div>
 
-    <!-- TOAST CONTAINER -->
-    <div id="toastContainer" class="toast-container"></div>
+    <!-- ============ TOASTS ============ -->
+    <div id="toastContainer" class="toast-wrap"></div>
 
     <script src="app.js"></script>
 </body>

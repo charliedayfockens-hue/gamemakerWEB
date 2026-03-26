@@ -3,157 +3,165 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GameForge Editor</title>
-    <link rel="stylesheet" href="style.css">
+    <title>WebGL Game Editor</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
-    <!-- ============ DASHBOARD ============ -->
-    <div id="dashboard" class="view active">
-        <header class="dash-header">
-            <div class="logo">
-                <div class="logo-icon">GF</div>
-                <h1>GameForge</h1>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>🎮 Game Editor</h1>
+                <button id="newProjectBtn" class="btn btn-primary">+ New Project</button>
             </div>
-            <button class="btn btn-primary" id="newProjectBtn">+ New Project</button>
-        </header>
-        <div class="dash-body">
-            <input type="text" id="searchProjects" class="search-input" placeholder="🔍  Search projects...">
-            <div id="projectGrid" class="project-grid"></div>
-            <div id="emptyState" class="empty-state">
-                <div class="empty-icon">📂</div>
-                <h2>No Projects Yet</h2>
-                <p>Click <strong>"+ New Project"</strong> to get started.</p>
+            <div class="projects-list" id="projectsList"></div>
+        </aside>
+        
+        <!-- Main Editor Area -->
+        <main class="editor-area">
+            <div class="no-project-selected" id="noProjectMessage">
+                <div class="empty-state">
+                    <span class="empty-icon">🎲</span>
+                    <h2>No Project Selected</h2>
+                    <p>Create a new project or select an existing one to get started.</p>
+                </div>
+            </div>
+            
+            <div class="project-editor" id="projectEditor" style="display: none;">
+                <!-- Project Header -->
+                <div class="project-header">
+                    <div class="project-info">
+                        <h2 id="projectName" class="editable" title="Click to rename"></h2>
+                        <span id="projectType" class="project-type-badge"></span>
+                    </div>
+                    <div class="project-actions">
+                        <button id="addFileBtn" class="btn btn-secondary">+ Add File</button>
+                        <button id="runProjectBtn" class="btn btn-success">▶ Run</button>
+                        <button id="deleteProjectBtn" class="btn btn-danger">🗑 Delete</button>
+                    </div>
+                </div>
+                
+                <!-- File Tabs -->
+                <div class="file-tabs" id="fileTabs"></div>
+                
+                <!-- Code Editor -->
+                <div class="code-editor-container">
+                    <div class="editor-info">
+                        <span id="currentFileName"></span>
+                        <span id="saveStatus">Auto-saved</span>
+                    </div>
+                    <textarea id="codeEditor" class="code-editor" spellcheck="false" placeholder="Start coding..."></textarea>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- New Project Modal -->
+    <div class="modal" id="newProjectModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Project</h3>
+                <button class="modal-close" id="closeNewProjectModal">&times;</button>
+            </div>
+            <div class="form-group">
+                <label for="newProjectName">Project Name</label>
+                <input type="text" id="newProjectName" placeholder="My Awesome Game">
+            </div>
+            <div class="form-group">
+                <label>Project Type</label>
+                <div class="project-type-options">
+                    <label class="type-option">
+                        <input type="radio" name="projectType" value="2d" checked>
+                        <span class="type-card">
+                            <span class="type-icon">🎮</span>
+                            <span class="type-name">2D Game</span>
+                            <span class="type-desc">Canvas-based 2D games</span>
+                        </span>
+                    </label>
+                    <label class="type-option">
+                        <input type="radio" name="projectType" value="app">
+                        <span class="type-card">
+                            <span class="type-icon">📱</span>
+                            <span class="type-name">Web App</span>
+                            <span class="type-desc">Standard web application</span>
+                        </span>
+                    </label>
+                    <label class="type-option">
+                        <input type="radio" name="projectType" value="webgl">
+                        <span class="type-card">
+                            <span class="type-icon">🎲</span>
+                            <span class="type-name">WebGL 3D</span>
+                            <span class="type-desc">3D graphics with WebGL</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelNewProject">Cancel</button>
+                <button class="btn btn-primary" id="createProject">Create Project</button>
             </div>
         </div>
     </div>
-
-    <!-- ============ EDITOR ============ -->
-    <div id="editor" class="view">
-        <div class="editor-topbar">
-            <div class="topbar-left">
-                <button class="btn btn-ghost" id="backToDash">← Back</button>
-                <span id="projectTypeBadge" class="badge">2D</span>
-                <span id="editorProjectName" class="project-title" title="Click to rename project">Untitled</span>
+    
+    <!-- Add File Modal -->
+    <div class="modal" id="addFileModal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>Add New File</h3>
+                <button class="modal-close" id="closeAddFileModal">&times;</button>
             </div>
-            <div class="topbar-right">
-                <button class="btn btn-run" id="runProject">▶ Run</button>
-                <button class="btn btn-delete" id="deleteProject">🗑 Delete Project</button>
+            <div class="form-group">
+                <label for="newFileName">File Name (with extension)</label>
+                <input type="text" id="newFileName" placeholder="e.g., utils.js, game.css">
             </div>
-        </div>
-        <div class="editor-main">
-            <aside class="sidebar">
-                <div class="sidebar-header">
-                    <span>FILES</span>
-                    <button class="btn-add-file" id="addFileBtn" title="Add new file">+</button>
-                </div>
-                <div id="fileList" class="file-list"></div>
-            </aside>
-            <div class="editor-area">
-                <div id="codeTabs" class="tab-bar"></div>
-                <div class="code-container">
-                    <div id="lineNumbers" class="line-numbers"></div>
-                    <textarea id="codeEditor" class="code-textarea" spellcheck="false"></textarea>
-                </div>
+            <div class="file-templates">
+                <span class="template-label">Quick templates:</span>
+                <button class="template-btn" data-name="script.js">.js</button>
+                <button class="template-btn" data-name="style.css">.css</button>
+                <button class="template-btn" data-name="page.html">.html</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelAddFile">Cancel</button>
+                <button class="btn btn-primary" id="confirmAddFile">Add File</button>
             </div>
         </div>
     </div>
-
-    <!-- ============ NEW PROJECT MODAL ============ -->
-    <div id="newProjectModal" class="overlay">
-        <div class="modal">
-            <div class="modal-top">
-                <h2>New Project</h2>
-                <button class="btn-close" id="closeModal">×</button>
+    
+    <!-- Rename Modal -->
+    <div class="modal" id="renameModal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3 id="renameModalTitle">Rename</h3>
+                <button class="modal-close" id="closeRenameModal">&times;</button>
             </div>
-            <div class="modal-content">
-                <label class="field-label">Project Name</label>
-                <input type="text" id="projectName" class="field-input" placeholder="My Awesome Game" maxlength="50">
-                <label class="field-label" style="margin-top:20px;">Project Type</label>
-                <div class="type-picker">
-                    <div class="type-option selected" data-type="2d">
-                        <div class="type-emoji">🎮</div>
-                        <strong>2D Game</strong>
-                        <small>Canvas-based 2D game</small>
-                    </div>
-                    <div class="type-option" data-type="app">
-                        <div class="type-emoji">🌐</div>
-                        <strong>Web App</strong>
-                        <small>Standard HTML/CSS/JS</small>
-                    </div>
-                    <div class="type-option" data-type="webgl">
-                        <div class="type-emoji">🧊</div>
-                        <strong>WebGL 3D</strong>
-                        <small>3D WebGL rendering</small>
-                    </div>
-                </div>
+            <div class="form-group">
+                <label for="renameInput">New Name</label>
+                <input type="text" id="renameInput">
             </div>
-            <div class="modal-bottom">
-                <button class="btn btn-cancel" id="cancelProject">Cancel</button>
-                <button class="btn btn-primary" id="createProject">Create</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============ RENAME MODAL ============ -->
-    <div id="renameModal" class="overlay">
-        <div class="modal modal-small">
-            <div class="modal-top">
-                <h2 id="renameModalTitle">Rename</h2>
-                <button class="btn-close" id="closeRenameModal">×</button>
-            </div>
-            <div class="modal-content">
-                <label class="field-label" id="renameLabel">New Name</label>
-                <input type="text" id="renameInput" class="field-input" maxlength="50">
-            </div>
-            <div class="modal-bottom">
-                <button class="btn btn-cancel" id="cancelRename">Cancel</button>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelRename">Cancel</button>
                 <button class="btn btn-primary" id="confirmRename">Rename</button>
             </div>
         </div>
     </div>
-
-    <!-- ============ ADD FILE MODAL ============ -->
-    <div id="addFileModal" class="overlay">
-        <div class="modal modal-small">
-            <div class="modal-top">
-                <h2>Add File</h2>
-                <button class="btn-close" id="closeAddFileModal">×</button>
+    
+    <!-- WebGL Test Window -->
+    <div class="webgl-overlay" id="webglOverlay" style="display: none;">
+        <div class="webgl-test-window" id="webglTestWindow">
+            <div class="webgl-header">
+                <div class="webgl-title">
+                    <span class="webgl-icon">🎲</span>
+                    <span>WebGL Test Environment</span>
+                </div>
+                <div class="webgl-controls">
+                    <button id="refreshWebgl" class="webgl-btn" title="Refresh">🔄</button>
+                    <button id="closeWebglTest" class="webgl-btn close" title="Close">✕</button>
+                </div>
             </div>
-            <div class="modal-content">
-                <label class="field-label">File name (with extension)</label>
-                <input type="text" id="newFileName" class="field-input" placeholder="utils.js">
-            </div>
-            <div class="modal-bottom">
-                <button class="btn btn-cancel" id="cancelAddFile">Cancel</button>
-                <button class="btn btn-primary" id="confirmAddFile">Add</button>
-            </div>
+            <iframe id="webglFrame" class="webgl-frame"></iframe>
         </div>
     </div>
-
-    <!-- ============ WEBGL PREVIEW ============ -->
-    <div id="webglPreview" class="webgl-window">
-        <div class="webgl-titlebar" id="webglTitlebar">
-            <span>WebGL Preview</span>
-            <div class="webgl-btns">
-                <button class="wgl-btn" id="webglReload" title="Reload">↻</button>
-                <button class="wgl-btn wgl-btn-close" id="webglClose" title="Close">×</button>
-            </div>
-        </div>
-        <iframe id="webglFrame" class="webgl-iframe"></iframe>
-        <div class="webgl-resize" id="webglResizeHandle"></div>
-    </div>
-
-    <!-- ============ RIGHT-CLICK MENU ============ -->
-    <div id="contextMenu" class="ctx-menu">
-        <div class="ctx-item" data-action="rename">✏️ Rename</div>
-        <div class="ctx-item" data-action="duplicate">📋 Duplicate</div>
-        <div class="ctx-item ctx-danger" data-action="delete">🗑️ Delete</div>
-    </div>
-
-    <!-- ============ TOASTS ============ -->
-    <div id="toastContainer" class="toast-wrap"></div>
-
-    <script src="app.js"></script>
+    
+    <script src="script.js"></script>
 </body>
 </html>

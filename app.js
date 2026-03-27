@@ -222,145 +222,429 @@ btn.addEventListener('click', () => {
     {
       name: 'styles.css',
       content: `* { margin: 0; padding: 0; }
-body { background: #000; overflow: hidden; }
-#canvas { display: block; width: 100vw; height: 100vh; }`,
+html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+#canvas { display: block; width: 100%; height: 100%; }`,
     },
     {
       name: 'webgl.js',
-      content: `// Defer until the page is fully laid out so canvas dimensions are correct
-window.addEventListener('load', function () {
+      content: `// Robust WebGL init – works in iframes, blob URLs, and new tabs
+(function init() {
+  var canvas = document.getElementById('canvas');
+  if (!canvas) { setTimeout(init, 16); return; }
 
-const canvas = document.getElementById('canvas');
-canvas.width  = canvas.clientWidth  || innerWidth  || 800;
-canvas.height = canvas.clientHeight || innerHeight || 600;
-
-const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-if (!gl) {
-  document.body.innerHTML = '<p style="color:#fff;padding:20px;font-family:monospace">WebGL not supported in this browser.</p>';
-  return;
-}
-
-// ── Shaders ───────────────────────────────────────────────────
-const VERT = \`
-  attribute vec3 aPos;
-  attribute vec4 aCol;
-  uniform   mat4 uModel;
-  varying lowp vec4 vCol;
-  void main() {
-    gl_Position = uModel * vec4(aPos, 1.0);
-    vCol = aCol;
+  // Force correct buffer size (CSS may report 0 inside iframes initially)
+  function resize() {
+    var w = canvas.clientWidth  || window.innerWidth  || 800;
+    var h = canvas.clientHeight || window.innerHeight || 600;
+    if (w < 1) w = window.innerWidth || 800;
+    if (h < 1) h = window.innerHeight || 600;
+    canvas.width  = w;
+    canvas.height = h;
+    return { w: w, h: h };
   }
-\`;
-const FRAG = \`
-  varying lowp vec4 vCol;
-  void main() { gl_FragColor = vCol; }
-\`;
+  resize();
 
-function mkShader(type, src) {
-  const s = gl.createShader(type);
-  gl.shaderSource(s, src);
-  gl.compileShader(s);
-  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
-    throw new Error(gl.getShaderInfoLog(s));
-  return s;
-}
+  var gl = canvas.getContext('webgl', { alpha: false, antialias: true })
+        || canvas.getContext('experimental-webgl');
+  if (!gl) {
+    document.body.innerHTML = '<p style="color:#fff;padding:20px;font-family:monospace">WebGL not supported.</p>';
+    return;
+  }
 
-const prog = gl.createProgram();
-gl.attachShader(prog, mkShader(gl.VERTEX_SHADER,   VERT));
-gl.attachShader(prog, mkShader(gl.FRAGMENT_SHADER, FRAG));
-gl.linkProgram(prog);
-gl.useProgram(prog);
+  // ── Shaders ───────────────────────────────────────────────────
+  var VERT = [
+    'attribute vec3 aPos;',
+    'attribute vec4 aCol;',
+    'uniform   mat4 uMVP;',
+    'varying lowp vec4 vCol;',
+    'void main() {',
+    '  gl_Position = uMVP * vec4(aPos, 1.0);',
+    '  vCol = aCol;',
+    '}'
+  ].join('\\n');
 
-// ── Geometry – colorful spinning cube (6 faces, 2 tris each) ──
-// prettier-ignore
-const VERTS = new Float32Array([
-  // Front  – red
-  -.5,-.5, .5,  1,.2,.2,1,  .5,-.5, .5,  1,.2,.2,1,  .5, .5, .5,  1,.2,.2,1,
-  -.5,-.5, .5,  1,.2,.2,1,  .5, .5, .5,  1,.2,.2,1, -.5, .5, .5,  1,.2,.2,1,
-  // Back   – cyan
-  -.5,-.5,-.5,  .2,.9,.9,1,  .5, .5,-.5,  .2,.9,.9,1,  .5,-.5,-.5,  .2,.9,.9,1,
-  -.5,-.5,-.5,  .2,.9,.9,1, -.5, .5,-.5,  .2,.9,.9,1,  .5, .5,-.5,  .2,.9,.9,1,
-  // Top    – green
-  -.5, .5,-.5,  .2,.9,.3,1,  .5, .5,-.5,  .2,.9,.3,1,  .5, .5, .5,  .2,.9,.3,1,
-  -.5, .5,-.5,  .2,.9,.3,1,  .5, .5, .5,  .2,.9,.3,1, -.5, .5, .5,  .2,.9,.3,1,
-  // Bottom – yellow
-  -.5,-.5,-.5,  1,.9,.1,1,  .5,-.5, .5,  1,.9,.1,1,  .5,-.5,-.5,  1,.9,.1,1,
-  -.5,-.5,-.5,  1,.9,.1,1, -.5,-.5, .5,  1,.9,.1,1,  .5,-.5, .5,  1,.9,.1,1,
-  // Right  – blue
-   .5,-.5,-.5,  .2,.4,1,1,   .5, .5,-.5,  .2,.4,1,1,   .5, .5, .5,  .2,.4,1,1,
-   .5,-.5,-.5,  .2,.4,1,1,   .5, .5, .5,  .2,.4,1,1,   .5,-.5, .5,  .2,.4,1,1,
-  // Left   – magenta
-  -.5,-.5,-.5,  .9,.2,.9,1, -.5, .5, .5,  .9,.2,.9,1, -.5, .5,-.5,  .9,.2,.9,1,
-  -.5,-.5,-.5,  .9,.2,.9,1, -.5,-.5, .5,  .9,.2,.9,1, -.5, .5, .5,  .9,.2,.9,1,
-]);
+  var FRAG = [
+    'varying lowp vec4 vCol;',
+    'void main() { gl_FragColor = vCol; }'
+  ].join('\\n');
 
-const buf = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-gl.bufferData(gl.ARRAY_BUFFER, VERTS, gl.STATIC_DRAW);
+  function mkShader(type, src) {
+    var s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      console.error('Shader error:', gl.getShaderInfoLog(s));
+      return null;
+    }
+    return s;
+  }
 
-const stride = 28; // 7 floats × 4 bytes
-const aPos = gl.getAttribLocation(prog, 'aPos');
-gl.enableVertexAttribArray(aPos);
-gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, stride, 0);
+  var vs = mkShader(gl.VERTEX_SHADER, VERT);
+  var fs = mkShader(gl.FRAGMENT_SHADER, FRAG);
+  if (!vs || !fs) return;
 
-const aCol = gl.getAttribLocation(prog, 'aCol');
-gl.enableVertexAttribArray(aCol);
-gl.vertexAttribPointer(aCol, 4, gl.FLOAT, false, stride, 12);
+  var prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    console.error('Program link error:', gl.getProgramInfoLog(prog));
+    return;
+  }
+  gl.useProgram(prog);
 
-const uModel = gl.getUniformLocation(prog, 'uModel');
-
-// ── Math helpers ──────────────────────────────────────────────
-function mat4Mul(a, b) {
-  const out = new Float32Array(16);
-  for (let r = 0; r < 4; r++)
-    for (let c = 0; c < 4; c++)
-      for (let k = 0; k < 4; k++)
-        out[r + c * 4] += a[r + k * 4] * b[k + c * 4];
-  return out;
-}
-
-function rotX(t) {
-  const c = Math.cos(t), s = Math.sin(t);
-  return new Float32Array([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]);
-}
-function rotY(t) {
-  const c = Math.cos(t), s = Math.sin(t);
-  return new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]);
-}
-function perspective(fov, asp, near, far) {
-  const f = 1 / Math.tan(fov / 2);
-  const d = near - far;
-  return new Float32Array([
-    f/asp, 0, 0, 0,
-    0, f, 0, 0,
-    0, 0, (far+near)/d, -1,
-    0, 0, (2*far*near)/d, 0,
+  // ── Geometry – colorful spinning cube ──────────────────────────
+  var V = new Float32Array([
+    // Front – red
+    -.5,-.5, .5,  1,.2,.2,1,  .5,-.5, .5,  1,.2,.2,1,  .5, .5, .5,  1,.2,.2,1,
+    -.5,-.5, .5,  1,.2,.2,1,  .5, .5, .5,  1,.2,.2,1, -.5, .5, .5,  1,.2,.2,1,
+    // Back – cyan
+    -.5,-.5,-.5,  .2,.9,.9,1,  .5, .5,-.5,  .2,.9,.9,1,  .5,-.5,-.5,  .2,.9,.9,1,
+    -.5,-.5,-.5,  .2,.9,.9,1, -.5, .5,-.5,  .2,.9,.9,1,  .5, .5,-.5,  .2,.9,.9,1,
+    // Top – green
+    -.5, .5,-.5,  .2,.9,.3,1,  .5, .5,-.5,  .2,.9,.3,1,  .5, .5, .5,  .2,.9,.3,1,
+    -.5, .5,-.5,  .2,.9,.3,1,  .5, .5, .5,  .2,.9,.3,1, -.5, .5, .5,  .2,.9,.3,1,
+    // Bottom – yellow
+    -.5,-.5,-.5,  1,.9,.1,1,  .5,-.5, .5,  1,.9,.1,1,  .5,-.5,-.5,  1,.9,.1,1,
+    -.5,-.5,-.5,  1,.9,.1,1, -.5,-.5, .5,  1,.9,.1,1,  .5,-.5, .5,  1,.9,.1,1,
+    // Right – blue
+     .5,-.5,-.5,  .2,.4,1,1,   .5, .5,-.5,  .2,.4,1,1,   .5, .5, .5,  .2,.4,1,1,
+     .5,-.5,-.5,  .2,.4,1,1,   .5, .5, .5,  .2,.4,1,1,   .5,-.5, .5,  .2,.4,1,1,
+    // Left – magenta
+    -.5,-.5,-.5,  .9,.2,.9,1, -.5, .5, .5,  .9,.2,.9,1, -.5, .5,-.5,  .9,.2,.9,1,
+    -.5,-.5,-.5,  .9,.2,.9,1, -.5,-.5, .5,  .9,.2,.9,1, -.5, .5, .5,  .9,.2,.9,1,
   ]);
+
+  var buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, V, gl.STATIC_DRAW);
+
+  var stride = 28;
+  var aPos = gl.getAttribLocation(prog, 'aPos');
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, stride, 0);
+
+  var aCol = gl.getAttribLocation(prog, 'aCol');
+  gl.enableVertexAttribArray(aCol);
+  gl.vertexAttribPointer(aCol, 4, gl.FLOAT, false, stride, 12);
+
+  var uMVP = gl.getUniformLocation(prog, 'uMVP');
+
+  // ── Math helpers ──────────────────────────────────────────────
+  function mul(a, b) {
+    var o = new Float32Array(16);
+    for (var r = 0; r < 4; r++)
+      for (var c = 0; c < 4; c++)
+        for (var k = 0; k < 4; k++)
+          o[r + c * 4] += a[r + k * 4] * b[k + c * 4];
+    return o;
+  }
+  function rotX(t) {
+    var c = Math.cos(t), s = Math.sin(t);
+    return new Float32Array([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]);
+  }
+  function rotY(t) {
+    var c = Math.cos(t), s = Math.sin(t);
+    return new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]);
+  }
+  function perspective(fov, asp, near, far) {
+    var f = 1 / Math.tan(fov / 2);
+    var d = near - far;
+    if (asp < 0.001) asp = 1; // prevent NaN
+    return new Float32Array([
+      f/asp, 0, 0, 0,
+      0, f, 0, 0,
+      0, 0, (far+near)/d, -1,
+      0, 0, (2*far*near)/d, 0,
+    ]);
+  }
+  function translate(x, y, z) {
+    return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]);
+  }
+
+  var t = 0;
+
+  // Rebuild projection on resize
+  window.addEventListener('resize', function() { resize(); });
+
+  // ── Render loop ───────────────────────────────────────────────
+  function render() {
+    t += 0.012;
+    // Recompute projection every frame to handle resize and avoid stale NaN
+    var asp = canvas.width / canvas.height;
+    var proj = perspective(Math.PI / 4, asp, 0.1, 100);
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(0.04, 0.04, 0.1, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    var model = mul(mul(translate(0, 0, -2.5), rotY(t)), rotX(t * 0.6));
+    var mvp   = mul(proj, model);
+    gl.uniformMatrix4fv(uMVP, false, mvp);
+    gl.drawArrays(gl.TRIANGLES, 0, 36);
+    requestAnimationFrame(render);
+  }
+  render();
+})();`,
+    },
+  ],
+
+  'particles': [
+    {
+      name: 'index.html',
+      content: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Particle System</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <script src="particles.js"><\/script>
+</body>
+</html>`,
+    },
+    {
+      name: 'styles.css',
+      content: `* { margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+#canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }`,
+    },
+    {
+      name: 'particles.js',
+      content: `const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
 }
-function translate(x, y, z) {
-  return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]);
+resize();
+window.addEventListener('resize', resize);
+
+// ── Particle pool ────────────────────────────────────────────
+const MAX = 800;
+const particles = [];
+let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+
+function spawn(x, y, count) {
+  for (let i = 0; i < count && particles.length < MAX; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 3;
+    const hue   = (Date.now() / 20 + Math.random() * 60) % 360;
+    particles.push({
+      x: x, y: y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1,
+      decay: 0.005 + Math.random() * 0.015,
+      size: 2 + Math.random() * 4,
+      hue: hue,
+    });
+  }
 }
 
-const proj = perspective(Math.PI / 4, canvas.width / canvas.height, 0.1, 100);
-let t = 0;
+canvas.addEventListener('mousemove', e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+canvas.addEventListener('click', e => spawn(e.clientX, e.clientY, 50));
 
-// ── Render loop ───────────────────────────────────────────────
-function render() {
-  t += 0.012;
-  gl.enable(gl.DEPTH_TEST);
-  gl.viewport(0, 0, canvas.width, canvas.height);
-  gl.clearColor(0.04, 0.04, 0.1, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+// ── Loop ─────────────────────────────────────────────────────
+function loop() {
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const model = mat4Mul(mat4Mul(translate(0, 0, -2.5), rotY(t)), rotX(t * 0.6));
-  const mvp   = mat4Mul(proj, model);
-  gl.uniformMatrix4fv(uModel, false, mvp);
-  gl.drawArrays(gl.TRIANGLES, 0, 36);
-  requestAnimationFrame(render);
+  // Auto-emit from mouse
+  spawn(mouse.x, mouse.y, 3);
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x    += p.vx;
+    p.y    += p.vy;
+    p.vy   += 0.02; // gravity
+    p.life -= p.decay;
+
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = 'hsl(' + p.hue + ', 100%, 60%)';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // HUD
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = '13px monospace';
+  ctx.fillText('Move mouse to emit | Click to burst | Particles: ' + particles.length, 12, 24);
+
+  requestAnimationFrame(loop);
 }
-render();
+loop();`,
+    },
+  ],
 
-}); // end window load`,
+  'platformer': [
+    {
+      name: 'index.html',
+      content: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Platformer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <script src="game.js"><\/script>
+</body>
+</html>`,
+    },
+    {
+      name: 'styles.css',
+      content: `* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+#canvas { display: block; border: 2px solid #4d8ef0; background: #0f0f23; image-rendering: pixelated; }`,
+    },
+    {
+      name: 'game.js',
+      content: `const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = 800; canvas.height = 400;
+
+// ── Level ────────────────────────────────────────────────────
+const TILE = 32;
+const COLS = 25, ROWS = 12;
+// 1 = solid, 2 = coin, 0 = air
+const level = [
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,1],
+  [1,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,1,1,1,1,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,1],
+  [1,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+];
+
+let coins = 0, totalCoins = 0;
+for (let r = 0; r < ROWS; r++)
+  for (let c = 0; c < COLS; c++)
+    if (level[r][c] === 2) totalCoins++;
+
+// ── Player ───────────────────────────────────────────────────
+const P = { x: 64, y: 288, w: 24, h: 28, vx: 0, vy: 0, onGround: false, color: '#4d8ef0' };
+const GRAV = 0.5, JUMP = -9, SPD = 4, FRIC = 0.8;
+
+// ── Input ────────────────────────────────────────────────────
+const keys = {};
+addEventListener('keydown', e => { keys[e.key] = true; e.preventDefault(); });
+addEventListener('keyup', e => { keys[e.key] = false; });
+
+function tileAt(px, py) {
+  var c = Math.floor(px / TILE), r = Math.floor(py / TILE);
+  if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return 1;
+  return level[r][c];
+}
+
+function update() {
+  // Horizontal
+  if (keys['ArrowLeft'] || keys['a']) P.vx = -SPD;
+  else if (keys['ArrowRight'] || keys['d']) P.vx = SPD;
+  else P.vx *= FRIC;
+
+  // Jump
+  if ((keys['ArrowUp'] || keys['w'] || keys[' ']) && P.onGround) {
+    P.vy = JUMP;
+    P.onGround = false;
+  }
+  P.vy += GRAV;
+
+  // Move X
+  P.x += P.vx;
+  if (tileAt(P.x, P.y) === 1 || tileAt(P.x, P.y + P.h - 1) === 1 ||
+      tileAt(P.x + P.w - 1, P.y) === 1 || tileAt(P.x + P.w - 1, P.y + P.h - 1) === 1) {
+    P.x -= P.vx; P.vx = 0;
+  }
+
+  // Move Y
+  P.y += P.vy;
+  P.onGround = false;
+  if (tileAt(P.x, P.y) === 1 || tileAt(P.x, P.y + P.h - 1) === 1 ||
+      tileAt(P.x + P.w - 1, P.y) === 1 || tileAt(P.x + P.w - 1, P.y + P.h - 1) === 1) {
+    if (P.vy > 0) P.onGround = true;
+    P.y -= P.vy; P.vy = 0;
+  }
+
+  // Coins
+  var cr = Math.floor((P.y + P.h / 2) / TILE);
+  var cc = Math.floor((P.x + P.w / 2) / TILE);
+  if (cr >= 0 && cr < ROWS && cc >= 0 && cc < COLS && level[cr][cc] === 2) {
+    level[cr][cc] = 0;
+    coins++;
+  }
+}
+
+function draw() {
+  ctx.fillStyle = '#0f0f23';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Tiles
+  for (var r = 0; r < ROWS; r++) {
+    for (var c = 0; c < COLS; c++) {
+      var t = level[r][c];
+      if (t === 1) {
+        ctx.fillStyle = '#2a2a4a';
+        ctx.fillRect(c * TILE, r * TILE, TILE, TILE);
+        ctx.strokeStyle = '#3a3a6a';
+        ctx.strokeRect(c * TILE, r * TILE, TILE, TILE);
+      } else if (t === 2) {
+        ctx.fillStyle = '#f0db4f';
+        ctx.beginPath();
+        ctx.arc(c * TILE + TILE / 2, r * TILE + TILE / 2, 8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // Player
+  ctx.shadowColor = P.color; ctx.shadowBlur = 12;
+  ctx.fillStyle = P.color;
+  ctx.fillRect(P.x, P.y, P.w, P.h);
+  ctx.shadowBlur = 0;
+
+  // Eyes
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(P.x + 6, P.y + 6, 5, 6);
+  ctx.fillRect(P.x + 14, P.y + 6, 5, 6);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(P.x + 8, P.y + 8, 3, 4);
+  ctx.fillRect(P.x + 16, P.y + 8, 3, 4);
+
+  // HUD
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 16px monospace';
+  ctx.fillText('Coins: ' + coins + ' / ' + totalCoins, 12, 28);
+  if (coins === totalCoins) {
+    ctx.fillStyle = '#3dba6f';
+    ctx.font = 'bold 28px monospace';
+    ctx.fillText('YOU WIN!', canvas.width / 2 - 70, canvas.height / 2);
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = '11px monospace';
+  ctx.fillText('WASD / Arrows + Space to jump', 12, canvas.height - 10);
+}
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+loop();`,
     },
   ],
 };
@@ -428,6 +712,8 @@ function initCM() {
       saveProjects();
       setSaveStatus('saved');
     }, 600);
+    // Auto-refresh preview if enabled
+    if (typeof triggerAutoRefresh === 'function') triggerAutoRefresh();
   });
 }
 
@@ -489,8 +775,10 @@ function renderEditor() {
   // Toolbar
   document.getElementById('projectNameLabel').textContent = proj.name;
   const badge = document.getElementById('typeBadge');
-  badge.textContent = proj.type === '2d' ? '2D Game' : proj.type === 'app' ? 'Web App' : 'WebGL 3D';
-  badge.className = 'type-badge badge-' + proj.type;
+  const typeLabels = { '2d': '2D Game', 'app': 'Web App', 'webgl': 'WebGL 3D', 'particles': 'Particles', 'platformer': 'Platformer' };
+  badge.textContent = typeLabels[proj.type] || proj.type;
+  var badgeClass = proj.type;
+  badge.className = 'type-badge badge-' + badgeClass;
 
   // File tabs
   renderTabs(proj);
@@ -690,7 +978,30 @@ function buildHTML(proj) {
   return html;
 }
 
-function runProject() {
+function injectConsoleCapture(html) {
+  const script = `<script>
+(function(){
+  var _log = console.log, _err = console.error, _warn = console.warn;
+  function send(type, args) {
+    try {
+      parent.postMessage({ __gmw_console: true, type: type, data: Array.from(args).map(function(a) {
+        if (a === null) return 'null';
+        if (a === undefined) return 'undefined';
+        if (typeof a === 'object') try { return JSON.stringify(a, null, 2); } catch(e) { return String(a); }
+        return String(a);
+      })}, '*');
+    } catch(e) {}
+  }
+  console.log   = function() { send('log',   arguments); _log.apply(console, arguments); };
+  console.error = function() { send('error', arguments); _err.apply(console, arguments); };
+  console.warn  = function() { send('warn',  arguments); _warn.apply(console, arguments); };
+  window.addEventListener('error', function(e) { send('error', [e.message + ' (line ' + e.lineno + ')']); });
+})();
+<\/script>`;
+  return html.replace('<head>', '<head>' + script);
+}
+
+function runProject(openInTab) {
   const proj = getProject(state.activeProjectId);
   if (!proj) return;
 
@@ -700,14 +1011,44 @@ function runProject() {
     return;
   }
 
-  const blob = new Blob([html], { type: 'text/html' });
+  const finalHTML = injectConsoleCapture(html);
+  const blob = new Blob([finalHTML], { type: 'text/html' });
   const url  = URL.createObjectURL(blob);
 
-  if (proj.type === 'webgl') {
+  if (openInTab) {
+    window.open(url, '_blank');
+  } else if (proj.type === 'webgl' || proj.type === 'particles') {
     openWebGLWindow(url, proj.name);
   } else {
     window.open(url, '_blank');
   }
+}
+
+function downloadProject() {
+  const proj = getProject(state.activeProjectId);
+  if (!proj) return;
+  const html = buildHTML(proj);
+  if (!html) return;
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (proj.name || 'project').replace(/[^a-zA-Z0-9_-]/g, '_') + '.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function duplicateProject(id) {
+  const orig = getProject(id);
+  if (!orig) return;
+  const files = orig.files.map(f => ({ id: uid(), name: f.name, content: f.content }));
+  const proj = { id: uid(), name: orig.name + ' (copy)', type: orig.type, files };
+  state.projects.push(proj);
+  saveProjects();
+  openProject(proj.id);
+  renderProjectList();
 }
 
 // ── WebGL floating window ─────────────────────────────────────
@@ -742,6 +1083,16 @@ function closeWebGLWindow() {
   win.style.display = 'none';
   frame.src = 'about:blank';
   if (wglCurrentURL) { URL.revokeObjectURL(wglCurrentURL); wglCurrentURL = null; }
+}
+
+function popOutWebGLWindow() {
+  if (wglCurrentURL) window.open(wglCurrentURL, '_blank');
+}
+
+function fullscreenWebGLWindow() {
+  const frame = document.getElementById('wglFrame');
+  if (frame.requestFullscreen) frame.requestFullscreen();
+  else if (frame.webkitRequestFullscreen) frame.webkitRequestFullscreen();
 }
 
 function refreshWebGLWindow() {
@@ -864,6 +1215,61 @@ function confirmDeleteProject(projId) {
   openModal('modalDelete');
 }
 
+// ── Console panel ─────────────────────────────────────────────
+let consoleOpen = false;
+
+function toggleConsole() {
+  const panel = document.getElementById('consolePanel');
+  consoleOpen = !consoleOpen;
+  panel.style.display = consoleOpen ? 'flex' : 'none';
+  const btn = document.getElementById('btnConsole');
+  if (btn) btn.classList.toggle('active', consoleOpen);
+  if (cm) setTimeout(() => cm.refresh(), 20);
+}
+
+function clearConsole() {
+  const log = document.getElementById('consoleLog');
+  if (log) log.innerHTML = '';
+}
+
+function appendConsole(type, data) {
+  const log = document.getElementById('consoleLog');
+  if (!log) return;
+  const line = document.createElement('div');
+  line.className = 'console-line console-' + type;
+  line.textContent = data.join(' ');
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+// Listen for console messages from iframe
+window.addEventListener('message', e => {
+  if (e.data && e.data.__gmw_console) {
+    appendConsole(e.data.type, e.data.data);
+  }
+});
+
+// ── Auto-refresh ──────────────────────────────────────────────
+let autoRefreshEnabled = false;
+let autoRefreshTimer = null;
+
+function toggleAutoRefresh() {
+  autoRefreshEnabled = !autoRefreshEnabled;
+  const btn = document.getElementById('btnAutoRefresh');
+  if (btn) btn.classList.toggle('active', autoRefreshEnabled);
+}
+
+function triggerAutoRefresh() {
+  if (!autoRefreshEnabled) return;
+  clearTimeout(autoRefreshTimer);
+  autoRefreshTimer = setTimeout(() => {
+    const wglWin = document.getElementById('wglWindow');
+    if (wglWin && wglWin.style.display !== 'none') {
+      refreshWebGLWindow();
+    }
+  }, 1000);
+}
+
 // ── Wire up all event listeners ───────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initCM();
@@ -966,11 +1372,26 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Run
-  document.getElementById('btnRun').addEventListener('click', runProject);
+  document.getElementById('btnRun').addEventListener('click', () => runProject(false));
+  document.getElementById('btnRunTab').addEventListener('click', () => runProject(true));
+  document.getElementById('btnDownload').addEventListener('click', downloadProject);
+
+  // Console
+  document.getElementById('btnConsole').addEventListener('click', toggleConsole);
+  document.getElementById('btnConsoleClear').addEventListener('click', clearConsole);
+  document.getElementById('btnConsoleClose').addEventListener('click', () => {
+    consoleOpen = true; // will be toggled to false
+    toggleConsole();
+  });
+
+  // Auto-refresh
+  document.getElementById('btnAutoRefresh').addEventListener('click', toggleAutoRefresh);
 
   // WebGL window controls
   document.getElementById('wglClose').addEventListener('click', closeWebGLWindow);
   document.getElementById('wglRefresh').addEventListener('click', refreshWebGLWindow);
+  document.getElementById('wglPopOut').addEventListener('click', popOutWebGLWindow);
+  document.getElementById('wglFullscreen').addEventListener('click', fullscreenWebGLWindow);
 
   // Context menu actions
   document.getElementById('ctxMenu').addEventListener('click', e => {
@@ -983,6 +1404,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (type === 'project') {
       if (action === 'rename') openRenameModal('project', id, null);
       if (action === 'delete') confirmDeleteProject(id);
+      if (action === 'duplicate') duplicateProject(id);
     } else if (type === 'file') {
       const proj = getProject(state.activeProjectId);
       if (action === 'rename') openRenameModal('file', state.activeProjectId, id);
@@ -1007,13 +1429,43 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // ESC closes topmost modal / context menu
+  // Keyboard shortcuts
   document.addEventListener('keydown', e => {
+    // ESC closes topmost modal / context menu
     if (e.key === 'Escape') {
       const open = document.querySelector('.modal-overlay[style*="flex"]');
       if (open) { closeModal(open.id); return; }
       if (document.getElementById('ctxMenu').classList.contains('open')) { hideCtxMenu(); return; }
       if (document.getElementById('wglWindow').style.display !== 'none') closeWebGLWindow();
+      return;
+    }
+
+    // Ctrl/Cmd shortcuts
+    const mod = e.ctrlKey || e.metaKey;
+    if (!mod) return;
+
+    if (e.key === 's') {
+      e.preventDefault();
+      // Force save
+      const proj = getProject(state.activeProjectId);
+      const file = getFile(proj, state.activeFileId);
+      if (cm && file) { file.content = cm.getValue(); saveProjects(); setSaveStatus('saved'); }
+    }
+    if (e.shiftKey && (e.key === 'R' || e.key === 'r')) {
+      e.preventDefault();
+      runProject(false);
+    }
+    if (e.shiftKey && (e.key === 'T' || e.key === 't')) {
+      e.preventDefault();
+      runProject(true);
+    }
+    if (e.key === 'j' || e.key === 'J') {
+      e.preventDefault();
+      toggleConsole();
+    }
+    if (e.shiftKey && (e.key === 'N' || e.key === 'n')) {
+      e.preventDefault();
+      document.getElementById('btnNewProject').click();
     }
   });
 });

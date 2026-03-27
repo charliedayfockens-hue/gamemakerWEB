@@ -218,15 +218,13 @@
   <!-- ===== WEBGL FLOATING TEST WINDOW ===== -->
   <div class="wgl-window" id="wglWindow" style="display:none">
     <div class="wgl-bar" id="wglBar">
-      <div class="wgl-dots">
-        <span class="wdot wdot-red"   id="wglClose"   title="Close"></span>
-        <span class="wdot wdot-amber" id="wglRefresh" title="Reload"></span>
-        <span class="wdot wdot-green"                 title="Running"></span>
-      </div>
       <span class="wgl-bar-title" id="wglBarTitle">WebGL Test</span>
-      <span class="wgl-bar-hint">drag to move</span>
+      <div class="wgl-win-controls">
+        <button class="wgl-ctrl" id="wglRefresh" title="Reload">&#8635;</button>
+        <button class="wgl-ctrl wgl-ctrl-close" id="wglClose" title="Close">&#10005;</button>
+      </div>
     </div>
-    <iframe class="wgl-frame" id="wglFrame" sandbox="allow-scripts"></iframe>
+    <iframe class="wgl-frame" id="wglFrame"></iframe>
     <div class="wgl-resize" id="wglResize"></div>
   </div>
 

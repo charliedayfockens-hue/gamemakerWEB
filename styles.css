@@ -648,46 +648,49 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 }
 
 .wgl-bar {
-  height: 36px;
-  background: var(--panel-bg);
-  border-bottom: 1px solid var(--border);
+  height: 32px;
+  background: #1f1f1f;
+  border-bottom: 1px solid #333;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 12px;
+  padding: 0 0 0 12px;
   cursor: move;
   user-select: none;
   flex-shrink: 0;
 }
 
-.wgl-dots { display: flex; gap: 6px; align-items: center; }
-.wdot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: filter .1s;
-}
-.wdot:hover { filter: brightness(1.2); }
-.wdot-red   { background: #ed6a5e; }
-.wdot-amber { background: #f4c03e; }
-.wdot-green { background: #60c353; cursor: default; }
-
 .wgl-bar-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
   flex: 1;
-  text-align: center;
+  font-size: 12px;
+  color: #d0d0d0;
   pointer-events: none;
-}
-
-.wgl-bar-hint {
-  font-size: 10px;
-  color: var(--text-dim);
-  pointer-events: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Windows-style control buttons */
+.wgl-win-controls {
+  display: flex;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.wgl-ctrl {
+  width: 46px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  color: #b0b0b0;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .1s, color .1s;
+}
+.wgl-ctrl:hover { background: rgba(255,255,255,.1); color: #fff; }
+.wgl-ctrl-close:hover { background: #c42b1c; color: #fff; }
 
 .wgl-frame {
   flex: 1;

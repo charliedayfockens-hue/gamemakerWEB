@@ -227,14 +227,17 @@ body { background: #000; overflow: hidden; }
     },
     {
       name: 'webgl.js',
-      content: `const canvas = document.getElementById('canvas');
-canvas.width  = innerWidth;
-canvas.height = innerHeight;
+      content: `// Defer until the page is fully laid out so canvas dimensions are correct
+window.addEventListener('load', function () {
 
-const gl = canvas.getContext('webgl');
+const canvas = document.getElementById('canvas');
+canvas.width  = canvas.clientWidth  || innerWidth  || 800;
+canvas.height = canvas.clientHeight || innerHeight || 600;
+
+const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
 if (!gl) {
   document.body.innerHTML = '<p style="color:#fff;padding:20px;font-family:monospace">WebGL not supported in this browser.</p>';
-  throw new Error('no webgl');
+  return;
 }
 
 // ── Shaders ───────────────────────────────────────────────────
@@ -268,7 +271,7 @@ gl.attachShader(prog, mkShader(gl.FRAGMENT_SHADER, FRAG));
 gl.linkProgram(prog);
 gl.useProgram(prog);
 
-// ── Geometry – colorful spinning cube faces (6 triangulated quads) ──
+// ── Geometry – colorful spinning cube (6 faces, 2 tris each) ──
 // prettier-ignore
 const VERTS = new Float32Array([
   // Front  – red
@@ -335,8 +338,7 @@ function perspective(fov, asp, near, far) {
   ]);
 }
 function translate(x, y, z) {
-  const m = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]);
-  return m;
+  return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]);
 }
 
 const proj = perspective(Math.PI / 4, canvas.width / canvas.height, 0.1, 100);
@@ -356,7 +358,9 @@ function render() {
   gl.drawArrays(gl.TRIANGLES, 0, 36);
   requestAnimationFrame(render);
 }
-render();`,
+render();
+
+}); // end window load`,
     },
   ],
 };
@@ -758,7 +762,7 @@ function refreshWebGLWindow() {
   const win = document.getElementById('wglWindow');
 
   bar.addEventListener('mousedown', e => {
-    if (e.target.classList.contains('wdot')) return;
+    if (e.target.closest('.wgl-win-controls')) return;
     dragging = true;
     ox = e.clientX - win.offsetLeft;
     oy = e.clientY - win.offsetTop;

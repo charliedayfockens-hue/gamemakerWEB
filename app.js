@@ -4,10 +4,14 @@
 ============================================================ */
 'use strict';
 
+// ── BroadcastChannel for game window management ──────────────
+const gameChannel = new BroadcastChannel('gmw_game_channel');
+let runningGameWindow = null;
+
 // ── Storage ──────────────────────────────────────────────────
 const STORAGE_KEY = 'gmw_projects_v1';
 
-function loadProjects() {
+function loadProjectsLocal() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
   } catch { return []; }
@@ -16,9 +20,145 @@ function saveProjects() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.projects));
 }
 
+// ── GitHub Gists Cloud Sync ──────────────────────────────────
+const github = {
+  token: localStorage.getItem('gmw_github_token') || null,
+  user: null,
+
+  async request(endpoint, options = {}) {
+    const url = endpoint.startsWith('http') ? endpoint : 'https://api.github.com' + endpoint;
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        'Authorization': 'token ' + this.token,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+    if (!res.ok) throw new Error('GitHub API error: ' + res.status);
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  },
+
+  async login(token) {
+    this.token = token;
+    const user = await this.request('/user');
+    this.user = user;
+    localStorage.setItem('gmw_github_token', token);
+    return user;
+  },
+
+  logout() {
+    this.token = null;
+    this.user = null;
+    localStorage.removeItem('gmw_github_token');
+  },
+
+  async loadProjects() {
+    if (!this.token) return [];
+    const gists = await this.request('/gists');
+    const projects = [];
+    for (const gist of gists) {
+      if (gist.description && gist.description.startsWith('[GameMakerWeb]')) {
+        const proj = this.gistToProject(gist);
+        if (proj) projects.push(proj);
+      }
+    }
+    return projects;
+  },
+
+  gistToProject(gist) {
+    const files = [];
+    let meta = {};
+    for (const [name, data] of Object.entries(gist.files)) {
+      if (name === '_meta.json') {
+        try { meta = JSON.parse(data.content); } catch (e) {}
+      } else {
+        files.push({ id: name, name, content: data.content || '' });
+      }
+    }
+    return {
+      id: 'gist_' + gist.id,
+      gistId: gist.id,
+      name: gist.description.replace('[GameMakerWeb] ', ''),
+      type: meta.type || '2d',
+      files,
+      gistUrl: gist.html_url,
+      cloudSynced: true,
+    };
+  },
+
+  async saveProject(proj) {
+    if (!this.token) return;
+    const gistFiles = {};
+    for (const f of proj.files) {
+      gistFiles[f.name] = { content: f.content || ' ' };
+    }
+    gistFiles['_meta.json'] = { content: JSON.stringify({ type: proj.type, version: '1.0' }) };
+
+    if (proj.gistId) {
+      await this.request('/gists/' + proj.gistId, {
+        method: 'PATCH',
+        body: JSON.stringify({ description: '[GameMakerWeb] ' + proj.name, files: gistFiles }),
+      });
+    } else {
+      const res = await this.request('/gists', {
+        method: 'POST',
+        body: JSON.stringify({ description: '[GameMakerWeb] ' + proj.name, public: false, files: gistFiles }),
+      });
+      proj.gistId = res.id;
+      proj.gistUrl = res.html_url;
+      proj.cloudSynced = true;
+    }
+    showToast('Synced to GitHub', 'success');
+  },
+
+  async deleteProject(proj) {
+    if (!this.token || !proj.gistId) return;
+    await this.request('/gists/' + proj.gistId, { method: 'DELETE' });
+  },
+};
+
+// ── Theme Management ─────────────────────────────────────────
+function initTheme() {
+  const saved = localStorage.getItem('gmw_theme') || 'dark';
+  setTheme(saved);
+}
+
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('gmw_theme', theme);
+  const btn = document.getElementById('btnTheme');
+  if (btn) btn.textContent = theme === 'dark' ? '\u2600' : '\u263D';
+  // Update CodeMirror theme
+  if (cm) cm.setOption('theme', theme === 'dark' ? 'monokai' : 'default');
+}
+
+function toggleTheme() {
+  const current = localStorage.getItem('gmw_theme') || 'dark';
+  setTheme(current === 'dark' ? 'light' : 'dark');
+}
+
+// ── Toast Notifications ──────────────────────────────────────
+function showToast(message, type) {
+  type = type || 'info';
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.className = 'toast toast-' + type;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(100%)';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
 // ── State ─────────────────────────────────────────────────────
 const state = {
-  projects: loadProjects(),
+  projects: loadProjectsLocal(),
   activeProjectId: null,
   activeFileId: null,
 };
@@ -984,12 +1124,13 @@ function injectConsoleCapture(html) {
   var _log = console.log, _err = console.error, _warn = console.warn;
   function send(type, args) {
     try {
-      parent.postMessage({ __gmw_console: true, type: type, data: Array.from(args).map(function(a) {
+      var ch = new BroadcastChannel('gmw_game_channel');
+      ch.postMessage({ __gmw_console: true, type: type, data: Array.from(args).map(function(a) {
         if (a === null) return 'null';
         if (a === undefined) return 'undefined';
         if (typeof a === 'object') try { return JSON.stringify(a, null, 2); } catch(e) { return String(a); }
         return String(a);
-      })}, '*');
+      })});
     } catch(e) {}
   }
   console.log   = function() { send('log',   arguments); _log.apply(console, arguments); };
@@ -1001,26 +1142,43 @@ function injectConsoleCapture(html) {
   return html.replace('<head>', '<head>' + script);
 }
 
+// ── Run project using document.write (reliable for WebGL) ────
 function runProject(openInTab) {
   const proj = getProject(state.activeProjectId);
   if (!proj) return;
 
   const html = buildHTML(proj);
   if (!html) {
-    alert('No HTML file found in this project.');
+    showToast('No HTML file found in this project.', 'error');
     return;
   }
 
   const finalHTML = injectConsoleCapture(html);
-  const blob = new Blob([finalHTML], { type: 'text/html' });
-  const url  = URL.createObjectURL(blob);
 
-  if (openInTab) {
-    window.open(url, '_blank');
-  } else if (proj.type === 'webgl' || proj.type === 'particles') {
-    openWebGLWindow(url, proj.name);
+  // Close any previously running game window
+  gameChannel.postMessage({ type: 'close_game' });
+  if (runningGameWindow && !runningGameWindow.closed) {
+    runningGameWindow.close();
+  }
+
+  if (openInTab || proj.type !== 'webgl') {
+    // Open in new tab and write HTML directly – this is the approach
+    // that makes WebGL/3D work reliably (no blob URL issues)
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.open();
+      win.document.write(finalHTML);
+      win.document.close();
+      runningGameWindow = win;
+      showToast('Game running in new tab!', 'success');
+    } else {
+      showToast('Please allow popups to run games.', 'error');
+    }
   } else {
-    window.open(url, '_blank');
+    // For WebGL type, also offer the floating preview window
+    const blob = new Blob([finalHTML], { type: 'text/html' });
+    const url  = URL.createObjectURL(blob);
+    openWebGLWindow(url, proj.name);
   }
 }
 
@@ -1242,10 +1400,16 @@ function appendConsole(type, data) {
   log.scrollTop = log.scrollHeight;
 }
 
-// Listen for console messages from iframe
-window.addEventListener('message', e => {
+// Listen for console messages via BroadcastChannel (works across tabs)
+gameChannel.addEventListener('message', e => {
   if (e.data && e.data.__gmw_console) {
     appendConsole(e.data.type, e.data.data);
+  }
+  if (e.data && e.data.type === 'close_game') {
+    if (runningGameWindow && !runningGameWindow.closed) {
+      runningGameWindow.close();
+      runningGameWindow = null;
+    }
   }
 });
 
@@ -1272,9 +1436,91 @@ function triggerAutoRefresh() {
 
 // ── Wire up all event listeners ───────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
   initCM();
   renderProjectList();
   renderEditor();
+
+  // Theme toggle
+  document.getElementById('btnTheme').addEventListener('click', toggleTheme);
+
+  // GitHub sync buttons
+  document.getElementById('btnGitHub').addEventListener('click', () => {
+    if (github.token) {
+      openModal('modalGitHubStatus');
+    } else {
+      openModal('modalGitHubLogin');
+    }
+  });
+
+  document.getElementById('btnGitHubConnect').addEventListener('click', async () => {
+    const input = document.getElementById('inputGitHubToken');
+    const token = input.value.trim();
+    if (!token) { input.focus(); return; }
+    const btn = document.getElementById('btnGitHubConnect');
+    btn.disabled = true;
+    btn.textContent = 'Connecting...';
+    try {
+      const user = await github.login(token);
+      closeModal('modalGitHubLogin');
+      showToast('Connected as ' + user.login, 'success');
+      updateGitHubUI();
+    } catch (e) {
+      showToast('Invalid token. Check and try again.', 'error');
+    }
+    btn.disabled = false;
+    btn.textContent = 'Connect';
+    input.value = '';
+  });
+
+  document.getElementById('inputGitHubToken').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('btnGitHubConnect').click();
+  });
+
+  document.getElementById('btnGitHubSync').addEventListener('click', async () => {
+    try {
+      showToast('Syncing...', 'info');
+      const cloudProjects = await github.loadProjects();
+      // Merge: add cloud projects not already in local
+      for (const cp of cloudProjects) {
+        if (!state.projects.find(p => p.gistId === cp.gistId)) {
+          state.projects.push(cp);
+        }
+      }
+      saveProjects();
+      renderProjectList();
+      showToast('Synced ' + cloudProjects.length + ' project(s) from GitHub', 'success');
+    } catch (e) {
+      showToast('Sync failed: ' + e.message, 'error');
+    }
+  });
+
+  document.getElementById('btnGitHubPush').addEventListener('click', async () => {
+    const proj = getProject(state.activeProjectId);
+    if (!proj) { showToast('No project selected', 'error'); return; }
+    try {
+      await github.saveProject(proj);
+      saveProjects();
+    } catch (e) {
+      showToast('Push failed: ' + e.message, 'error');
+    }
+  });
+
+  document.getElementById('btnGitHubLogout').addEventListener('click', () => {
+    github.logout();
+    closeModal('modalGitHubStatus');
+    updateGitHubUI();
+    showToast('Signed out from GitHub', 'info');
+  });
+
+  // Init GitHub UI state
+  if (github.token) {
+    github.request('/user').then(user => {
+      github.user = user;
+      updateGitHubUI();
+    }).catch(() => {});
+  }
+  updateGitHubUI();
 
   // Sidebar new project
   document.getElementById('btnNewProject').addEventListener('click', () => {
@@ -1468,4 +1714,24 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('btnNewProject').click();
     }
   });
+
+  // Cleanup on unload
+  window.addEventListener('beforeunload', () => {
+    if (runningGameWindow && !runningGameWindow.closed) runningGameWindow.close();
+  });
 });
+
+// ── GitHub UI helper ──────────────────────────────────────────
+function updateGitHubUI() {
+  const btn = document.getElementById('btnGitHub');
+  if (github.token && github.user) {
+    btn.textContent = '\u2601 ' + github.user.login;
+    btn.title = 'GitHub: ' + github.user.login;
+  } else if (github.token) {
+    btn.textContent = '\u2601 GitHub';
+    btn.title = 'GitHub connected';
+  } else {
+    btn.textContent = '\u2601 GitHub';
+    btn.title = 'Connect to GitHub for cloud sync';
+  }
+}

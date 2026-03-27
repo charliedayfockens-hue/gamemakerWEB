@@ -43,7 +43,11 @@
           </svg>
           <span class="brand-name">GameMaker Web</span>
         </div>
-        <button class="btn-new" id="btnNewProject">&#43; New</button>
+        <div class="sidebar-actions">
+          <button class="btn-icon" id="btnTheme" title="Toggle light/dark theme">&#9788;</button>
+          <button class="btn-icon btn-github" id="btnGitHub" title="Connect to GitHub for cloud sync">&#9729; GitHub</button>
+          <button class="btn-new" id="btnNewProject">&#43; New</button>
+        </div>
       </div>
 
       <div class="sidebar-label">PROJECTS</div>
@@ -271,6 +275,50 @@
     <iframe class="wgl-frame" id="wglFrame"></iframe>
     <div class="wgl-resize" id="wglResize"></div>
   </div>
+
+  <!-- ===== MODAL: GITHUB LOGIN ===== -->
+  <div class="modal-overlay" id="modalGitHubLogin" style="display:none">
+    <div class="modal modal-sm">
+      <div class="modal-head">
+        <h3>Connect to GitHub</h3>
+        <button class="modal-x" data-close="modalGitHubLogin">&times;</button>
+      </div>
+      <div class="modal-bd">
+        <p class="gh-desc">Sync your projects to GitHub Gists for cloud backup. You need a <strong>Personal Access Token</strong> with <code>gist</code> scope.</p>
+        <label class="lbl" for="inputGitHubToken" style="margin-top:14px">Personal Access Token</label>
+        <input class="inp" type="password" id="inputGitHubToken" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off" />
+        <p class="gh-hint">Go to GitHub &rarr; Settings &rarr; Developer settings &rarr; Personal access tokens &rarr; Generate with <code>gist</code> scope.</p>
+      </div>
+      <div class="modal-ft">
+        <button class="btn-secondary" data-close="modalGitHubLogin">Cancel</button>
+        <button class="btn-primary" id="btnGitHubConnect">Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: GITHUB STATUS ===== -->
+  <div class="modal-overlay" id="modalGitHubStatus" style="display:none">
+    <div class="modal modal-sm">
+      <div class="modal-head">
+        <h3>GitHub Cloud Sync</h3>
+        <button class="modal-x" data-close="modalGitHubStatus">&times;</button>
+      </div>
+      <div class="modal-bd">
+        <p class="gh-desc">Your projects can be synced to GitHub Gists for backup and sharing.</p>
+        <div class="gh-actions">
+          <button class="btn-primary" id="btnGitHubSync" style="width:100%;margin-bottom:8px">&#8635; Pull Projects from GitHub</button>
+          <button class="btn-primary" id="btnGitHubPush" style="width:100%;margin-bottom:8px;background:var(--green)">&#8593; Push Current Project to GitHub</button>
+          <button class="btn-toolbar btn-del" id="btnGitHubLogout" style="width:100%;text-align:center">Sign Out</button>
+        </div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn-secondary" data-close="modalGitHubStatus">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TOAST CONTAINER ===== -->
+  <div class="toast-container" id="toastContainer"></div>
 
   <script src="app.js"></script>
 </body>

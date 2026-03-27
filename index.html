@@ -17,6 +17,12 @@
   <!-- CodeMirror addons -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+  <!-- Search addons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/search.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/jump-to-line.min.js"></script>
 
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -75,7 +81,11 @@
           </div>
           <div class="toolbar-right">
             <button class="btn-toolbar" id="btnAddFile" title="Add a new file">&#43; File</button>
-            <button class="btn-run" id="btnRun" title="Run project">&#9654; Run</button>
+            <button class="btn-toolbar btn-toggle" id="btnAutoRefresh" title="Auto-refresh preview on save">&#8634; Auto</button>
+            <button class="btn-toolbar" id="btnConsole" title="Toggle console (Ctrl+J)">&#9638; Console</button>
+            <button class="btn-toolbar" id="btnDownload" title="Download as HTML">&#8615; Export</button>
+            <button class="btn-run" id="btnRun" title="Run project (Ctrl+Shift+R)">&#9654; Run</button>
+            <button class="btn-run btn-run-tab" id="btnRunTab" title="Run in new tab (Ctrl+Shift+T)">&#8599; Tab</button>
             <button class="btn-toolbar btn-del" id="btnDeleteProject" title="Delete project">&#128465;</button>
           </div>
         </div>
@@ -89,9 +99,22 @@
           <div id="cmHost" style="display:none; height:100%;"></div>
         </div>
 
+        <!-- Console panel -->
+        <div class="console-panel" id="consolePanel" style="display:none">
+          <div class="console-header">
+            <span class="console-title">Console</span>
+            <div class="console-actions">
+              <button class="console-btn" id="btnConsoleClear" title="Clear">Clear</button>
+              <button class="console-btn console-close-btn" id="btnConsoleClose" title="Close">&times;</button>
+            </div>
+          </div>
+          <div class="console-log" id="consoleLog"></div>
+        </div>
+
         <!-- Status bar -->
         <div class="statusbar">
           <span id="sbFile"></span>
+          <span class="sb-shortcuts">Ctrl+S save &middot; Ctrl+Shift+R run &middot; Ctrl+J console</span>
           <span id="sbSave" class="sb-save saved">All changes saved</span>
         </div>
 
@@ -102,6 +125,7 @@
   <!-- ===== CONTEXT MENU ===== -->
   <ul class="ctx-menu" id="ctxMenu">
     <li class="ctx-item" data-action="rename">&#9998; Rename</li>
+    <li class="ctx-item" data-action="duplicate">&#10697; Duplicate</li>
     <li class="ctx-item danger" data-action="delete">&#128465; Delete</li>
   </ul>
 
@@ -143,6 +167,24 @@
               <span class="tc-icon">&#127922;</span>
               <span class="tc-name">WebGL 3D</span>
               <span class="tc-desc">3D graphics rendered with raw WebGL</span>
+            </div>
+          </label>
+
+          <label class="type-card">
+            <input type="radio" name="ptype" value="particles" />
+            <div class="tc-inner">
+              <span class="tc-icon">&#10024;</span>
+              <span class="tc-name">Particles</span>
+              <span class="tc-desc">Interactive particle system with mouse control</span>
+            </div>
+          </label>
+
+          <label class="type-card">
+            <input type="radio" name="ptype" value="platformer" />
+            <div class="tc-inner">
+              <span class="tc-icon">&#127939;</span>
+              <span class="tc-name">Platformer</span>
+              <span class="tc-desc">Side-scrolling platformer with physics &amp; coins</span>
             </div>
           </label>
 
@@ -221,6 +263,8 @@
       <span class="wgl-bar-title" id="wglBarTitle">WebGL Test</span>
       <div class="wgl-win-controls">
         <button class="wgl-ctrl" id="wglRefresh" title="Reload">&#8635;</button>
+        <button class="wgl-ctrl" id="wglFullscreen" title="Fullscreen">&#9974;</button>
+        <button class="wgl-ctrl" id="wglPopOut" title="Open in new tab">&#8599;</button>
         <button class="wgl-ctrl wgl-ctrl-close" id="wglClose" title="Close">&#10005;</button>
       </div>
     </div>

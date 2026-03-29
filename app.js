@@ -1,686 +1,209 @@
-// =============================================
-// WebGL Game Editor - Local Storage Version
-// With Settings, Light/Dark Theme
-// =============================================
+/* ============================================================
+   MORE COOL SCIENCE GAMES — APP.JS
+   To add a game: edit games.json only. No JS changes needed.
 
-const gameChannel = new BroadcastChannel('webgl_game_editor_channel');
-let runningGameWindow = null;
-let currentProject = null;
-let currentFile = null;
-let projects = {};
-let saveTimeout = null;
+   Supported games.json fields per entry:
+     id          - unique string
+     title       - display name
+     category    - used in filter nav
+     description - shown in modal
+     tags        - array of strings
+     url         - iframe src
+     thumbnail   - emoji
+     allow       - (optional) iframe allow attribute
+     scrolling   - (optional) "yes" | "no", default "no"
+     frameborder - (optional) "0" | "1", default "0"
+   ============================================================ */
 
-// =============================================
-// DOM ELEMENTS
-// =============================================
+let allGames = [];
+let filteredGames = [];
+let activeCategory = 'All';
 
-const mainApp = document.getElementById('mainApp');
-const settingsBtn = document.getElementById('settingsBtn');
-const settingsModal = document.getElementById('settingsModal');
-const projectList = document.getElementById('projectList');
-const archivedList = document.getElementById('archivedList');
-const projectEditor = document.getElementById('projectEditor');
-const noProjectSelected = document.getElementById('noProjectSelected');
-const projectName = document.getElementById('projectName');
-const fileTabs = document.getElementById('fileTabs');
-const codeEditor = document.getElementById('codeEditor');
-const editorStatus = document.getElementById('editorStatus');
+const gameGrid      = document.getElementById('gameGrid');
+const searchInput   = document.getElementById('searchInput');
+const searchClear   = document.getElementById('searchClear');
+const resultCount   = document.getElementById('resultCount');
+const categoryNav   = document.getElementById('categoryNav');
+const emptyState    = document.getElementById('emptyState');
+const modalOverlay  = document.getElementById('modalOverlay');
+const modalClose    = document.getElementById('modalClose');
+const modalEmoji    = document.getElementById('modalEmoji');
+const modalTitle    = document.getElementById('modalTitle');
+const modalCategory = document.getElementById('modalCategory');
+const modalDesc     = document.getElementById('modalDesc');
+const modalTags     = document.getElementById('modalTags');
+const btnFullscreen = document.getElementById('btnFullscreen');
+const btnOpen       = document.getElementById('btnOpen');
 
-// Buttons
-const newProjectBtn = document.getElementById('newProjectBtn');
-const addFileBtn = document.getElementById('addFileBtn');
-const downloadProjectBtn = document.getElementById('downloadProjectBtn');
-const archiveProjectBtn = document.getElementById('archiveProjectBtn');
-const deleteProjectBtn = document.getElementById('deleteProjectBtn');
-const runProjectBtn = document.getElementById('runProjectBtn');
-const editProjectNameBtn = document.getElementById('editProjectNameBtn');
-
-// Modals
-const newProjectModal = document.getElementById('newProjectModal');
-const newFileModal = document.getElementById('newFileModal');
-const renameFileModal = document.getElementById('renameFileModal');
-const fileContextMenu = document.getElementById('fileContextMenu');
-
-// =============================================
-// TEMPLATES
-// =============================================
-
-const templates = {
-    blank: {
-        files: {
-            'index.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>My Game</title>\n    <link rel="stylesheet" href="style.css">\n</head>\n<body>\n    <h1>Hello World!</h1>\n    <script src="script.js"></script>\n</body>\n</html>',
-            'style.css': '/* Your styles here */\nbody {\n    margin: 0;\n    padding: 20px;\n    font-family: Arial, sans-serif;\n    background: #1a1a2e;\n    color: white;\n}',
-            'script.js': '// Your JavaScript code here\nconsole.log("Hello from JavaScript!");'
-        }
-    },
-    webgl: {
-        files: {
-            'index.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>WebGL Game</title>\n    <link rel="stylesheet" href="style.css">\n</head>\n<body>\n    <canvas id="glCanvas"></canvas>\n    <script src="main.js"></script>\n</body>\n</html>',
-            'style.css': '* {\n    margin: 0;\n    padding: 0;\n    box-sizing: border-box;\n}\n\nbody {\n    overflow: hidden;\n    background: #000;\n}\n\n#glCanvas {\n    display: block;\n    width: 100vw;\n    height: 100vh;\n}',
-            'main.js': '// WebGL Setup\nconst canvas = document.getElementById("glCanvas");\nconst gl = canvas.getContext("webgl");\n\nif (!gl) {\n    alert("WebGL not supported!");\n}\n\ncanvas.width = window.innerWidth;\ncanvas.height = window.innerHeight;\ngl.viewport(0, 0, canvas.width, canvas.height);\n\ngl.clearColor(0.1, 0.2, 0.3, 1.0);\ngl.clear(gl.COLOR_BUFFER_BIT);\n\nconsole.log("WebGL ready!");'
-        }
-    },
-    canvas: {
-        files: {
-            'index.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>Canvas Game</title>\n    <link rel="stylesheet" href="style.css">\n</head>\n<body>\n    <canvas id="gameCanvas"></canvas>\n    <script src="game.js"></script>\n</body>\n</html>',
-            'style.css': '* {\n    margin: 0;\n    padding: 0;\n}\n\nbody {\n    overflow: hidden;\n    background: #1a1a2e;\n}\n\n#gameCanvas {\n    display: block;\n}',
-            'game.js': 'const canvas = document.getElementById("gameCanvas");\nconst ctx = canvas.getContext("2d");\n\ncanvas.width = window.innerWidth;\ncanvas.height = window.innerHeight;\n\nconst player = {\n    x: canvas.width / 2,\n    y: canvas.height / 2,\n    size: 30,\n    speed: 5,\n    color: "#00ff88"\n};\n\nconst keys = {};\ndocument.addEventListener("keydown", e => keys[e.key] = true);\ndocument.addEventListener("keyup", e => keys[e.key] = false);\n\nfunction update() {\n    if (keys["ArrowUp"] || keys["w"]) player.y -= player.speed;\n    if (keys["ArrowDown"] || keys["s"]) player.y += player.speed;\n    if (keys["ArrowLeft"] || keys["a"]) player.x -= player.speed;\n    if (keys["ArrowRight"] || keys["d"]) player.x += player.speed;\n}\n\nfunction draw() {\n    ctx.fillStyle = "#1a1a2e";\n    ctx.fillRect(0, 0, canvas.width, canvas.height);\n    \n    ctx.beginPath();\n    ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);\n    ctx.fillStyle = player.color;\n    ctx.fill();\n    \n    ctx.fillStyle = "#fff";\n    ctx.font = "18px Arial";\n    ctx.fillText("Use WASD or Arrow Keys", 20, 30);\n}\n\nfunction gameLoop() {\n    update();\n    draw();\n    requestAnimationFrame(gameLoop);\n}\n\ngameLoop();'
-        }
-    }
-};
-
-// =============================================
-// THEME MANAGEMENT
-// =============================================
-
-function initTheme() {
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    setTheme(savedTheme);
+// ============================================================
+// INIT — ./ ensures correct path on GitHub Pages subdirectories
+// ============================================================
+async function init() {
+  try {
+    const res = await fetch('./games.json');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    allGames = await res.json();
+    buildCategoryNav();
+    applyFilters();
+  } catch (err) {
+    console.error('Failed to load games.json:', err);
+    gameGrid.innerHTML = '<p style="color:#f87171;padding:32px;font-family:sans-serif;">Error loading games.json — ' + err.message + '</p>';
+  }
 }
 
-function setTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
+// ============================================================
+// CATEGORY NAV
+// ============================================================
+function buildCategoryNav() {
+  const categories = ['All', ...new Set(allGames.map(g => g.category))].sort((a, b) =>
+    a === 'All' ? -1 : b === 'All' ? 1 : a.localeCompare(b)
+  );
 
-    document.querySelectorAll('.theme-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.theme === theme);
+  categoryNav.innerHTML = categories.map(cat => `
+    <button class="cat-btn${cat === activeCategory ? ' active' : ''}" data-cat="${cat}">${cat}</button>
+  `).join('');
+
+  categoryNav.querySelectorAll('.cat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeCategory = btn.dataset.cat;
+      categoryNav.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyFilters();
     });
+  });
 }
 
-document.getElementById('themeLightBtn')?.addEventListener('click', () => setTheme('light'));
-document.getElementById('themeDarkBtn')?.addEventListener('click', () => setTheme('dark'));
+// ============================================================
+// FILTER + RENDER
+// ============================================================
+function applyFilters() {
+  const query = searchInput.value.trim().toLowerCase();
 
-// =============================================
-// LOCAL STORAGE
-// =============================================
+  filteredGames = allGames.filter(game => {
+    const matchCat = activeCategory === 'All' || game.category === activeCategory;
+    const matchSearch = !query ||
+      game.title.toLowerCase().includes(query) ||
+      game.description.toLowerCase().includes(query) ||
+      game.tags.some(t => t.toLowerCase().includes(query)) ||
+      game.category.toLowerCase().includes(query);
+    return matchCat && matchSearch;
+  });
 
-const STORAGE_KEY = 'game_editor_projects';
-
-function loadProjects() {
-    try {
-        const data = localStorage.getItem(STORAGE_KEY);
-        projects = data ? JSON.parse(data) : {};
-    } catch (e) {
-        projects = {};
-    }
-    renderProjectList();
-    renderArchivedList();
+  renderGrid();
+  updateResultCount();
 }
 
-function saveAllProjects() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-}
+function renderGrid() {
+  if (filteredGames.length === 0) {
+    gameGrid.style.display = 'none';
+    emptyState.style.display = 'block';
+    return;
+  }
 
-// =============================================
-// INITIALIZATION
-// =============================================
+  gameGrid.style.display = 'grid';
+  emptyState.style.display = 'none';
 
-function init() {
-    initTheme();
-    loadProjects();
-}
+  gameGrid.innerHTML = filteredGames.map((game, i) => `
+    <div class="game-card" data-id="${game.id}" style="animation-delay:${i * 40}ms">
+      <div class="card-thumb">
+        <span>${game.thumbnail}</span>
+      </div>
+      <div class="card-body">
+        <span class="card-category">${game.category}</span>
+        <h3 class="card-title">${game.title}</h3>
+        <p class="card-desc">${game.description}</p>
+        <div class="card-tags">
+          ${game.tags.map(t => `<span class="tag">${t}</span>`).join('')}
+        </div>
+        <button class="card-play">▶ Play</button>
+      </div>
+    </div>
+  `).join('');
 
-// =============================================
-// SETTINGS MODAL
-// =============================================
-
-settingsBtn?.addEventListener('click', () => {
-    const currentTheme = localStorage.getItem('theme') || 'dark';
-    document.querySelectorAll('.theme-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.theme === currentTheme);
+  gameGrid.querySelectorAll('.game-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const game = allGames.find(g => g.id === card.dataset.id);
+      if (game) openModal(game);
     });
-
-    settingsModal.classList.add('active');
-});
-
-// =============================================
-// UI RENDERING
-// =============================================
-
-function renderProjectList() {
-    const active = Object.values(projects).filter(p => !p.archived);
-    projectList.innerHTML = active.length === 0 ? '<p class="no-items">No projects yet</p>' : '';
-
-    active.forEach(project => {
-        const item = document.createElement('div');
-        item.className = `project-item ${currentProject?.id === project.id ? 'active' : ''}`;
-        item.innerHTML = `
-            <i class="fas fa-folder"></i>
-            <span class="project-item-name">${escapeHtml(project.name)}</span>
-        `;
-        item.addEventListener('click', () => selectProject(project.id));
-        projectList.appendChild(item);
-    });
+  });
 }
 
-function renderArchivedList() {
-    const archived = Object.values(projects).filter(p => p.archived);
-    archivedList.innerHTML = archived.length === 0 ? '<p class="no-items">No archived projects</p>' : '';
-
-    archived.forEach(project => {
-        const item = document.createElement('div');
-        item.className = `project-item ${currentProject?.id === project.id ? 'active' : ''}`;
-        item.innerHTML = `
-            <i class="fas fa-archive"></i>
-            <span class="project-item-name">${escapeHtml(project.name)}</span>
-            <div class="project-item-actions">
-                <button title="Restore" onclick="event.stopPropagation(); restoreProject('${project.id}')">
-                    <i class="fas fa-undo"></i>
-                </button>
-            </div>
-        `;
-        item.addEventListener('click', () => selectProject(project.id));
-        archivedList.appendChild(item);
-    });
+function updateResultCount() {
+  const total = allGames.length;
+  const shown = filteredGames.length;
+  resultCount.textContent = shown === total
+    ? `${total} game${total !== 1 ? 's' : ''}`
+    : `${shown} of ${total} games`;
 }
 
-function selectProject(projectId) {
-    saveCurrentFile();
+// ============================================================
+// SEARCH
+// ============================================================
+searchInput.addEventListener('input', () => {
+  searchClear.classList.toggle('visible', searchInput.value.length > 0);
+  applyFilters();
+});
 
-    currentProject = projects[projectId];
-    currentFile = null;
+searchClear.addEventListener('click', () => {
+  searchInput.value = '';
+  searchClear.classList.remove('visible');
+  searchInput.focus();
+  applyFilters();
+});
 
-    if (currentProject) {
-        noProjectSelected.classList.add('hidden');
-        projectEditor.classList.remove('hidden');
-        projectName.textContent = currentProject.name;
-
-        renderFileTabs();
-
-        const fileNames = Object.keys(currentProject.files);
-        if (fileNames.length > 0) {
-            selectFile(fileNames[0]);
-        } else {
-            codeEditor.value = '';
-            codeEditor.disabled = true;
-        }
-    }
-
-    renderProjectList();
-    renderArchivedList();
+// ============================================================
+// MODAL — all iframe attributes driven by games.json
+// ============================================================
+function buildIframe(game) {
+  const iframe = document.createElement('iframe');
+  iframe.src         = game.url;
+  iframe.frameBorder = game.frameborder ?? '0';
+  iframe.scrolling   = game.scrolling   ?? 'no';
+  if (game.allow) iframe.allow = game.allow;
+  iframe.style.cssText = 'display:block;border:none;width:100%;height:520px;';
+  return iframe;
 }
 
-function showNoProjectSelected() {
-    noProjectSelected.classList.remove('hidden');
-    projectEditor.classList.add('hidden');
+function openModal(game) {
+  modalEmoji.textContent    = game.thumbnail;
+  modalTitle.textContent    = game.title;
+  modalCategory.textContent = game.category;
+  modalDesc.textContent     = game.description;
+  modalTags.innerHTML       = game.tags.map(t => `<span class="tag">${t}</span>`).join('');
+  btnOpen.href              = game.url;
+
+  const wrap = document.getElementById('iframeWrap');
+  wrap.innerHTML = '';
+  wrap.appendChild(buildIframe(game));
+
+  modalOverlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
 
-window.restoreProject = function(projectId) {
-    const project = projects[projectId];
-    if (!project) return;
-
-    project.archived = false;
-    saveAllProjects();
-    renderProjectList();
-    renderArchivedList();
-    showToast('Project restored', 'success');
-};
-
-// =============================================
-// FILE TABS
-// =============================================
-
-function renderFileTabs() {
-    fileTabs.innerHTML = '';
-    if (!currentProject?.files) return;
-
-    Object.keys(currentProject.files).forEach(filename => {
-        const tab = document.createElement('div');
-        const ext = filename.split('.').pop();
-        tab.className = `file-tab ${currentFile === filename ? 'active' : ''}`;
-        tab.innerHTML = `
-            <i class="file-tab-icon ${ext} ${getFileIcon(ext)}"></i>
-            <span>${escapeHtml(filename)}</span>
-        `;
-        tab.addEventListener('click', () => selectFile(filename));
-        tab.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            showFileContextMenu(e, filename);
-        });
-        fileTabs.appendChild(tab);
-    });
+function closeModal() {
+  modalOverlay.classList.remove('open');
+  document.body.style.overflow = '';
+  setTimeout(() => {
+    const wrap = document.getElementById('iframeWrap');
+    if (wrap) wrap.innerHTML = '';
+  }, 280);
 }
 
-function getFileIcon(ext) {
-    const icons = { html: 'fab fa-html5', css: 'fab fa-css3-alt', js: 'fab fa-js-square' };
-    return icons[ext] || 'fas fa-file';
-}
+modalClose.addEventListener('click', closeModal);
+modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-function selectFile(filename) {
-    if (currentProject?.files?.[filename] === undefined) return;
-
-    saveCurrentFile();
-    currentFile = filename;
-    codeEditor.value = currentProject.files[filename] || '';
-    codeEditor.disabled = false;
-    renderFileTabs();
-}
-
-function saveCurrentFile() {
-    if (currentProject && currentFile && currentProject.files.hasOwnProperty(currentFile)) {
-        currentProject.files[currentFile] = codeEditor.value;
-    }
-}
-
-// =============================================
-// CODE EDITOR
-// =============================================
-
-codeEditor?.addEventListener('input', () => {
-    if (currentProject && currentFile) {
-        currentProject.files[currentFile] = codeEditor.value;
-
-        clearTimeout(saveTimeout);
-        setEditorStatus('saving', 'Saving...');
-        saveTimeout = setTimeout(() => {
-            saveAllProjects();
-            setEditorStatus('saved', 'Saved');
-        }, 600);
-    }
+// ============================================================
+// FULLSCREEN
+// ============================================================
+btnFullscreen.addEventListener('click', () => {
+  const iframe = document.getElementById('iframeWrap')?.querySelector('iframe');
+  if (!iframe) return;
+  const fn = iframe.requestFullscreen || iframe.webkitRequestFullscreen || iframe.mozRequestFullScreen;
+  if (fn) fn.call(iframe);
 });
 
-codeEditor?.addEventListener('keydown', (e) => {
-    if (e.key === 'Tab') {
-        e.preventDefault();
-        const start = codeEditor.selectionStart;
-        const end = codeEditor.selectionEnd;
-        codeEditor.value = codeEditor.value.substring(0, start) + '    ' + codeEditor.value.substring(end);
-        codeEditor.selectionStart = codeEditor.selectionEnd = start + 4;
-    }
-});
-
-function setEditorStatus(type, message) {
-    if (!editorStatus) return;
-
-    editorStatus.className = `status-${type}`;
-    const icons = {
-        saved: 'fas fa-check-circle',
-        saving: 'fas fa-spinner fa-pulse',
-        error: 'fas fa-exclamation-circle'
-    };
-    editorStatus.innerHTML = `<i class="${icons[type] || 'fas fa-circle'}"></i> ${message}`;
-}
-
-// =============================================
-// RUN PROJECT
-// =============================================
-
-runProjectBtn?.addEventListener('click', () => {
-    if (!currentProject?.files) return;
-
-    saveCurrentFile();
-    saveAllProjects();
-
-    gameChannel.postMessage({ type: 'close_game' });
-    if (runningGameWindow && !runningGameWindow.closed) {
-        runningGameWindow.close();
-    }
-
-    let html = currentProject.files['index.html'] || '<!DOCTYPE html><html><head></head><body></body></html>';
-    let css = '';
-    let js = '';
-
-    Object.entries(currentProject.files).forEach(([filename, content]) => {
-        if (filename.endsWith('.css')) {
-            css += `/* ${filename} */\n${content}\n\n`;
-        } else if (filename.endsWith('.js')) {
-            js += `// ${filename}\n${content}\n\n`;
-        }
-    });
-
-    html = html.replace(/<link[^>]*href=["'][^"']*\.css["'][^>]*>/gi, '');
-    html = html.replace(/<script[^>]*src=["'][^"']*\.js["'][^>]*><\/script>/gi, '');
-
-    const finalHtml = html
-        .replace('</head>', `<style>${css}</style></head>`)
-        .replace('</body>', `<script>${js}<\/script></body>`);
-
-    runningGameWindow = window.open('', '_blank', 'width=1024,height=768');
-
-    if (runningGameWindow) {
-        runningGameWindow.document.open();
-        runningGameWindow.document.write(finalHtml);
-        runningGameWindow.document.close();
-        showToast('Game running!', 'success');
-    } else {
-        showToast('Allow popups to run games', 'error');
-    }
-});
-
-gameChannel.addEventListener('message', (e) => {
-    if (e.data.type === 'close_game' && runningGameWindow && !runningGameWindow.closed) {
-        runningGameWindow.close();
-        runningGameWindow = null;
-    }
-});
-
-// =============================================
-// DOWNLOAD PROJECT
-// =============================================
-
-downloadProjectBtn?.addEventListener('click', async () => {
-    if (!currentProject?.files) return;
-
-    saveCurrentFile();
-
-    const zip = new JSZip();
-    Object.entries(currentProject.files).forEach(([filename, content]) => {
-        zip.file(filename, content);
-    });
-
-    const blob = await zip.generateAsync({ type: 'blob' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${currentProject.name}.zip`;
-    a.click();
-    URL.revokeObjectURL(url);
-
-    showToast('Downloaded!', 'success');
-});
-
-// =============================================
-// ARCHIVE & DELETE
-// =============================================
-
-archiveProjectBtn?.addEventListener('click', () => {
-    if (!currentProject) return;
-
-    currentProject.archived = true;
-    saveAllProjects();
-    showNoProjectSelected();
-    currentProject = null;
-    currentFile = null;
-    renderProjectList();
-    renderArchivedList();
-    showToast('Project archived', 'success');
-});
-
-deleteProjectBtn?.addEventListener('click', () => {
-    if (!currentProject) return;
-
-    if (confirm(`Delete "${currentProject.name}"? This cannot be undone.`)) {
-        const projectId = currentProject.id;
-        showNoProjectSelected();
-        currentProject = null;
-        currentFile = null;
-        delete projects[projectId];
-        saveAllProjects();
-        renderProjectList();
-        renderArchivedList();
-        showToast('Project deleted', 'success');
-    }
-});
-
-// =============================================
-// RENAME PROJECT
-// =============================================
-
-editProjectNameBtn?.addEventListener('click', () => {
-    projectName.contentEditable = 'true';
-    projectName.focus();
-    document.execCommand('selectAll', false, null);
-});
-
-projectName?.addEventListener('blur', () => {
-    projectName.contentEditable = 'false';
-    const newName = projectName.textContent.trim();
-
-    if (newName && newName !== currentProject.name) {
-        currentProject.name = newName;
-        saveAllProjects();
-        renderProjectList();
-        renderArchivedList();
-        showToast('Renamed', 'success');
-    } else {
-        projectName.textContent = currentProject.name;
-    }
-});
-
-projectName?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        projectName.blur();
-    }
-});
-
-// =============================================
-// NEW PROJECT
-// =============================================
-
-function generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-}
-
-newProjectBtn?.addEventListener('click', () => {
-    document.getElementById('newProjectName').value = '';
-    document.querySelector('input[name="template"][value="blank"]').checked = true;
-    newProjectModal.classList.add('active');
-    document.getElementById('newProjectName').focus();
-});
-
-document.getElementById('createProjectBtn')?.addEventListener('click', () => {
-    const name = document.getElementById('newProjectName').value.trim();
-    const template = document.querySelector('input[name="template"]:checked').value;
-
-    if (!name) {
-        showToast('Enter project name', 'error');
-        return;
-    }
-
-    const project = {
-        id: generateId(),
-        name,
-        files: JSON.parse(JSON.stringify(templates[template].files)),
-        archived: false
-    };
-
-    projects[project.id] = project;
-    saveAllProjects();
-
-    closeAllModals();
-    renderProjectList();
-    selectProject(project.id);
-    showToast('Project created!', 'success');
-});
-
-// =============================================
-// FILE OPERATIONS
-// =============================================
-
-addFileBtn?.addEventListener('click', () => {
-    document.getElementById('newFileName').value = '';
-    document.getElementById('newFileType').value = 'js';
-    newFileModal.classList.add('active');
-    document.getElementById('newFileName').focus();
-});
-
-document.getElementById('createFileBtn')?.addEventListener('click', () => {
-    const name = document.getElementById('newFileName').value.trim();
-    const type = document.getElementById('newFileType').value;
-
-    if (!name || !/^[a-zA-Z0-9_-]+$/.test(name)) {
-        showToast('Invalid file name', 'error');
-        return;
-    }
-
-    const filename = `${name}.${type}`;
-
-    if (currentProject.files[filename]) {
-        showToast('File already exists', 'error');
-        return;
-    }
-
-    currentProject.files[filename] = '';
-    saveAllProjects();
-    closeAllModals();
-    renderFileTabs();
-    selectFile(filename);
-    showToast('File added', 'success');
-});
-
-let contextMenuFile = null;
-
-function showFileContextMenu(e, filename) {
-    contextMenuFile = filename;
-    fileContextMenu.style.left = e.pageX + 'px';
-    fileContextMenu.style.top = e.pageY + 'px';
-    fileContextMenu.classList.add('active');
-}
-
-document.addEventListener('click', () => fileContextMenu?.classList.remove('active'));
-
-fileContextMenu?.querySelectorAll('.context-menu-item').forEach(item => {
-    item.addEventListener('click', () => {
-        const action = item.dataset.action;
-
-        if (action === 'rename') {
-            const baseName = contextMenuFile.split('.').slice(0, -1).join('.');
-            document.getElementById('renameFileName').value = baseName;
-            renameFileModal.classList.add('active');
-            document.getElementById('renameFileName').focus();
-        } else if (action === 'delete') {
-            if (Object.keys(currentProject.files).length <= 1) {
-                showToast('Cannot delete last file', 'error');
-                return;
-            }
-
-            if (confirm('Delete this file?')) {
-                delete currentProject.files[contextMenuFile];
-                saveAllProjects();
-
-                if (currentFile === contextMenuFile) {
-                    currentFile = Object.keys(currentProject.files)[0];
-                }
-
-                renderFileTabs();
-                if (currentFile) selectFile(currentFile);
-                showToast('File deleted', 'success');
-            }
-        }
-    });
-});
-
-document.getElementById('confirmRenameFileBtn')?.addEventListener('click', () => {
-    const newBaseName = document.getElementById('renameFileName').value.trim();
-
-    if (!newBaseName || !/^[a-zA-Z0-9_-]+$/.test(newBaseName)) {
-        showToast('Invalid name', 'error');
-        return;
-    }
-
-    const ext = contextMenuFile.split('.').pop();
-    const newFilename = `${newBaseName}.${ext}`;
-
-    if (currentProject.files[newFilename] && newFilename !== contextMenuFile) {
-        showToast('File already exists', 'error');
-        return;
-    }
-
-    const content = currentProject.files[contextMenuFile];
-    delete currentProject.files[contextMenuFile];
-    currentProject.files[newFilename] = content;
-
-    if (currentFile === contextMenuFile) {
-        currentFile = newFilename;
-    }
-
-    saveAllProjects();
-    closeAllModals();
-    renderFileTabs();
-    selectFile(currentFile);
-    showToast('File renamed', 'success');
-});
-
-// =============================================
-// MODALS
-// =============================================
-
-document.querySelectorAll('.modal-close, .modal-cancel').forEach(btn => {
-    btn.addEventListener('click', closeAllModals);
-});
-
-document.querySelectorAll('.modal').forEach(modal => {
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeAllModals();
-    });
-});
-
-function closeAllModals() {
-    document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
-}
-
-document.getElementById('newProjectName')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('createProjectBtn').click();
-});
-
-document.getElementById('newFileName')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('createFileBtn').click();
-});
-
-document.getElementById('renameFileName')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('confirmRenameFileBtn').click();
-});
-
-// =============================================
-// SIDEBAR TABS
-// =============================================
-
-document.querySelectorAll('.sidebar-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        const view = tab.dataset.view;
-
-        document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-
-        document.querySelectorAll('.sidebar-view').forEach(v => v.classList.remove('active'));
-        document.getElementById(`${view}View`)?.classList.add('active');
-    });
-});
-
-// =============================================
-// UTILITIES
-// =============================================
-
-function showToast(message, type = 'info') {
-    const icons = {
-        success: 'fas fa-check-circle',
-        error: 'fas fa-exclamation-circle',
-        info: 'fas fa-info-circle'
-    };
-
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `
-        <i class="toast-icon ${icons[type]}"></i>
-        <span class="toast-message">${escapeHtml(message)}</span>
-    `;
-
-    document.getElementById('toastContainer')?.appendChild(toast);
-
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(100%)';
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-window.addEventListener('beforeunload', () => {
-    saveCurrentFile();
-    saveAllProjects();
-    if (runningGameWindow && !runningGameWindow.closed) {
-        runningGameWindow.close();
-    }
-});
-
-// =============================================
-// INITIALIZE
-// =============================================
-
-document.addEventListener('DOMContentLoaded', init);
+// ============================================================
+// BOOT
+// ============================================================
+init();

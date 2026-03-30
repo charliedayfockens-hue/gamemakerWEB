@@ -9,24 +9,26 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/monokai.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
-  <!-- CodeMirror language modes -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
-  <!-- CodeMirror addons -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/search.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.css" />
 
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
   <!-- ===== APP SHELL ===== -->
-  <div class="app">
+  <div class="app" id="app">
 
     <!-- SIDEBAR -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-top">
         <div class="brand">
           <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -40,9 +42,23 @@
         <button class="btn-new" id="btnNewProject">&#43; New</button>
       </div>
 
+      <!-- Search projects -->
+      <div class="sidebar-search">
+        <input class="search-inp" type="text" id="projectSearch" placeholder="&#128269; Search projects…" autocomplete="off" />
+      </div>
+
       <div class="sidebar-label">PROJECTS</div>
       <ul class="project-list" id="projectList"></ul>
+
+      <!-- SW status badge -->
+      <div class="sw-badge" id="swBadge" title="Service Worker status">
+        <span class="sw-dot" id="swDot"></span>
+        <span id="swLabel">Loading…</span>
+      </div>
     </aside>
+
+    <!-- Sidebar resize handle -->
+    <div class="sidebar-handle" id="sidebarHandle"></div>
 
     <!-- MAIN AREA -->
     <main class="main">
@@ -64,18 +80,20 @@
         <button class="btn-primary" id="btnEmptyNew">Create Project</button>
       </div>
 
-      <!-- Project editor (hidden until a project is selected) -->
+      <!-- Project editor -->
       <div class="project-editor" id="projectEditor" style="display:none">
 
-        <!-- Editor toolbar -->
+        <!-- Toolbar -->
         <div class="editor-toolbar">
           <div class="toolbar-left">
             <span class="project-name-label" id="projectNameLabel" title="Click to rename"></span>
             <span class="type-badge" id="typeBadge"></span>
           </div>
           <div class="toolbar-right">
-            <button class="btn-toolbar" id="btnAddFile" title="Add a new file">&#43; File</button>
-            <button class="btn-run" id="btnRun" title="Run project">&#9654; Run</button>
+            <button class="btn-toolbar" id="btnAddFile" title="Add file (Alt+N)">&#43; File</button>
+            <button class="btn-toolbar" id="btnExport" title="Export project as HTML file">&#8595; Export</button>
+            <button class="btn-toolbar" id="btnToggleConsole" title="Toggle console (Ctrl+`)">&#9654; Console</button>
+            <button class="btn-run" id="btnRun" title="Run project (Ctrl+Enter)">&#9654; Run</button>
             <button class="btn-toolbar btn-del" id="btnDeleteProject" title="Delete project">&#128465;</button>
           </div>
         </div>
@@ -83,15 +101,34 @@
         <!-- File tabs -->
         <div class="file-tabs" id="fileTabs"></div>
 
-        <!-- CodeMirror container -->
+        <!-- CodeMirror host -->
         <div class="editor-body" id="editorBody">
-          <div class="no-file-msg" id="noFileMsg">Select a file tab above to edit it.</div>
+          <div class="no-file-msg" id="noFileMsg">Select a file tab above to start editing.</div>
           <div id="cmHost" style="display:none; height:100%;"></div>
+        </div>
+
+        <!-- Console panel (collapsible) -->
+        <div class="console-panel" id="consolePanel" style="display:none">
+          <div class="console-bar">
+            <span class="console-title">Console</span>
+            <div class="console-filters">
+              <button class="cf-btn cf-all active" data-cf="all">All</button>
+              <button class="cf-btn cf-log"  data-cf="log">Log</button>
+              <button class="cf-btn cf-warn" data-cf="warn">Warn</button>
+              <button class="cf-btn cf-err"  data-cf="error">Error</button>
+            </div>
+            <button class="console-clear" id="consoleClear" title="Clear console">&#10005; Clear</button>
+          </div>
+          <div class="console-output" id="consoleOutput">
+            <div class="console-empty">No output yet. Run your project to see logs here.</div>
+          </div>
         </div>
 
         <!-- Status bar -->
         <div class="statusbar">
           <span id="sbFile"></span>
+          <span id="sbCursor" class="sb-cursor"></span>
+          <span class="sb-sep"></span>
           <span id="sbSave" class="sb-save saved">All changes saved</span>
         </div>
 
@@ -102,6 +139,8 @@
   <!-- ===== CONTEXT MENU ===== -->
   <ul class="ctx-menu" id="ctxMenu">
     <li class="ctx-item" data-action="rename">&#9998; Rename</li>
+    <li class="ctx-item" data-action="duplicate">&#10064; Duplicate</li>
+    <li class="ctx-divider"></li>
     <li class="ctx-item danger" data-action="delete">&#128465; Delete</li>
   </ul>
 
@@ -133,7 +172,7 @@
             <div class="tc-inner">
               <span class="tc-icon">&#128187;</span>
               <span class="tc-name">Web App</span>
-              <span class="tc-desc">Standard HTML/CSS/JS web application</span>
+              <span class="tc-desc">Standard HTML/CSS/JS application</span>
             </div>
           </label>
 
@@ -171,6 +210,7 @@
           <button class="quick-btn" data-template="css">CSS</button>
           <button class="quick-btn" data-template="html">HTML</button>
           <button class="quick-btn" data-template="json">JSON</button>
+          <button class="quick-btn" data-template="glsl">GLSL</button>
         </div>
       </div>
       <div class="modal-ft">
@@ -220,6 +260,9 @@
     <div class="wgl-bar" id="wglBar">
       <span class="wgl-bar-title" id="wglBarTitle">WebGL Test</span>
       <div class="wgl-win-controls">
+        <button class="wgl-ctrl wgl-ctrl-autoreload" id="wglAutoReload" title="Auto-reload on save (off)">&#9711; Auto</button>
+        <button class="wgl-ctrl" id="wglPopout" title="Open in new tab">&#11035;</button>
+        <button class="wgl-ctrl" id="wglFullscreen" title="Fullscreen">&#9974;</button>
         <button class="wgl-ctrl" id="wglRefresh" title="Reload">&#8635;</button>
         <button class="wgl-ctrl wgl-ctrl-close" id="wglClose" title="Close">&#10005;</button>
       </div>
